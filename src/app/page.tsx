@@ -1,65 +1,381 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useMemo, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import useSWR from "swr";
+import { Activity, Database, ShieldAlert, Users } from "lucide-react";
+
+import { GateDonutChart } from "@/components/charts/gate-donut-chart";
+import { MemoryLineChart } from "@/components/charts/memory-line-chart";
+import { MetricCard } from "@/components/metric-card";
+import { QuotaBar } from "@/components/quota-bar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ApiRequestError,
+  type QuotaMode,
+  getAllTenantUsers,
+  getGateBreakdown,
+  getMemoryAdditions,
+  getRecentActivity,
+  getTenantUsage,
+} from "@/lib/api";
+
+function ErrorCard({
+  title,
+  description,
+  onRetry,
+}: {
+  title: string;
+  description: string;
+  onRetry: () => void;
+}) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <Card className="border border-rose-200 bg-rose-50/70">
+      <CardHeader>
+        <CardTitle className="text-rose-950">{title}</CardTitle>
+        <CardDescription className="text-rose-800">
+          {description}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button variant="outline" onClick={onRetry}>
+          Retry
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionSkeleton({ className = "" }: { className?: string }) {
+  return (
+    <Card className={className}>
+      <CardHeader>
+        <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+        <div className="h-3 w-44 animate-pulse rounded bg-slate-200" />
+      </CardHeader>
+      <CardContent>
+        <div className="h-56 animate-pulse rounded-2xl bg-slate-200" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getStatusClassName(status: "queued" | "blocked" | "passthrough") {
+  if (status === "blocked") {
+    return "border-rose-200 bg-rose-100 text-rose-800";
+  }
+  if (status === "passthrough") {
+    return "border-amber-200 bg-amber-100 text-amber-800";
+  }
+  return "border-emerald-200 bg-emerald-100 text-emerald-800";
+}
+
+function getStatusLabel(status: "queued" | "blocked" | "passthrough") {
+  if (status === "passthrough") {
+    return "Passthrough";
+  }
+  if (status === "blocked") {
+    return "Blocked";
+  }
+  return "Queued";
+}
+
+export default function OverviewPage() {
+  const { isLoaded, getToken } = useAuth();
+  const [renderedAt] = useState(() => Date.now());
+  const swrKeyReady = isLoaded ? "ready" : null;
+
+  const usage = useSWR(
+    swrKeyReady ? "tenant-usage" : null,
+    () => getTenantUsage(getToken),
+    { refreshInterval: 30_000 },
+  );
+
+  const users = useSWR(
+    swrKeyReady ? "tenant-users" : null,
+    () => getAllTenantUsers(getToken),
+    { refreshInterval: 30_000 },
+  );
+
+  const additions = useSWR(
+    swrKeyReady ? "memory-additions" : null,
+    () => getMemoryAdditions(getToken),
+    { refreshInterval: 30_000 },
+  );
+
+  const gateBreakdown = useSWR(
+    swrKeyReady ? "gate-breakdown" : null,
+    () => getGateBreakdown(getToken),
+    { refreshInterval: 30_000 },
+  );
+
+  const recentActivity = useSWR(
+    swrKeyReady && usage.data ? ["recent-activity", usage.data.mode] : null,
+    ([, mode]: [string, QuotaMode]) => getRecentActivity(getToken, mode),
+    { refreshInterval: 30_000 },
+  );
+
+  const metrics = useMemo(() => {
+    const allUsers = users.data ?? [];
+    const memoriesStored = allUsers.reduce(
+      (sum, user) => sum + user.memory_count,
+      0,
+    );
+    const thirtyDaysAgo = renderedAt - 30 * 24 * 60 * 60 * 1000;
+    const activeUsers30d = allUsers.filter((user) => {
+      if (!user.last_active_at) {
+        return false;
+      }
+      const value = new Date(user.last_active_at).getTime();
+      return !Number.isNaN(value) && value >= thirtyDaysAgo;
+    }).length;
+
+    const quotaUsedPct = usage.data
+      ? Math.max(
+          0,
+          Math.min(100, (1 - (usage.data.budget_remaining_pct ?? 0)) * 100),
+        )
+      : 0;
+
+    const gateTotals = (gateBreakdown.data ?? []).reduce(
+      (sum, slice) => sum + slice.value,
+      0,
+    );
+    const additionTotals = (additions.data ?? []).reduce(
+      (sum, point) => sum + point.count,
+      0,
+    );
+    const gateBlockRate =
+      additionTotals + gateTotals > 0
+        ? (gateTotals / (additionTotals + gateTotals)) * 100
+        : 0;
+
+    return {
+      memoriesStored,
+      quotaUsedPct,
+      activeUsers30d,
+      gateBlockRate,
+    };
+  }, [additions.data, gateBreakdown.data, renderedAt, usage.data, users.data]);
+
+  const usageError = usage.error as ApiRequestError | undefined;
+  const usersError = users.error as ApiRequestError | undefined;
+
+  return (
+    <div className="flex flex-col gap-6 pt-14 md:pt-0">
+      <div className="flex flex-col gap-2">
+        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+          Tenant Overview
+        </span>
+        <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+              MemoryOS control surface
+            </h1>
+            <p className="max-w-3xl text-sm text-slate-600 sm:text-base">
+              Monitor tenant usage, memory growth, and quality gate behavior in
+              one place.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {usage.data?.mode === "PASSTHROUGH" ? (
+        <Card className="border border-rose-200 bg-rose-50 text-rose-950">
+          <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold">Memory writes are in passthrough mode</div>
+              <div className="text-sm text-rose-900/80">
+                Quota is exhausted or the system is degraded. Your app should
+                keep running, but new memories will not be stored until capacity
+                returns.
+              </div>
+            </div>
+            <Button className="w-full sm:w-auto">Upgrade Plan</Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {usage.data?.mode === "DEGRADED_RETRIEVE" ? (
+        <Card className="border border-amber-200 bg-amber-50 text-amber-950">
+          <CardContent className="py-5">
+            <div className="text-sm font-semibold">New memories paused</div>
+            <div className="mt-1 text-sm text-amber-900/80">
+              Retrieval is running in a degraded mode. MemoryOS is still serving
+              requests, but fresh writes may be temporarily delayed.
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          title="Memories Stored"
+          value={metrics.memoriesStored.toLocaleString("en-IN")}
+          description="Total memories indexed for this tenant"
+          icon={Database}
+          loading={users.isLoading && !users.data}
+          error={usersError?.message}
+          onRetry={() => void users.mutate()}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <MetricCard
+          title="Quota Used %"
+          value={formatPercent(metrics.quotaUsedPct)}
+          description="Rolling monthly API budget consumption"
+          icon={Activity}
+          loading={usage.isLoading && !usage.data}
+          error={usageError?.message}
+          onRetry={() => void usage.mutate()}
+        />
+        <MetricCard
+          title="Active Users (30d)"
+          value={metrics.activeUsers30d.toLocaleString("en-IN")}
+          description="Users with memory activity in the last 30 days"
+          icon={Users}
+          loading={users.isLoading && !users.data}
+          error={usersError?.message}
+          onRetry={() => void users.mutate()}
+        />
+        <MetricCard
+          title="Gate Block Rate"
+          value={formatPercent(metrics.gateBlockRate)}
+          description="Share of recent activity stopped by the quality gate"
+          icon={ShieldAlert}
+          loading={
+            (additions.isLoading && !additions.data) ||
+            (gateBreakdown.isLoading && !gateBreakdown.data)
+          }
+          error={
+            (additions.error as ApiRequestError | undefined)?.message ??
+            (gateBreakdown.error as ApiRequestError | undefined)?.message
+          }
+          onRetry={() => {
+            void additions.mutate();
+            void gateBreakdown.mutate();
+          }}
+        />
+      </section>
+
+      <QuotaBar
+        loading={usage.isLoading && !usage.data}
+        error={usageError?.message}
+        percentUsed={metrics.quotaUsedPct}
+        mode={usage.data?.mode ?? "FULL"}
+        callsUsed={usage.data?.calls_used}
+        callsLimit={usage.data?.calls_limit}
+        onRetry={() => void usage.mutate()}
+      />
+
+      <section className="grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+        <MemoryLineChart
+          data={additions.data ?? []}
+          loading={additions.isLoading && !additions.data}
+          error={(additions.error as ApiRequestError | undefined)?.message}
+          onRetry={() => void additions.mutate()}
+        />
+        <GateDonutChart
+          data={gateBreakdown.data ?? []}
+          loading={gateBreakdown.isLoading && !gateBreakdown.data}
+          error={(gateBreakdown.error as ApiRequestError | undefined)?.message}
+          onRetry={() => void gateBreakdown.mutate()}
+        />
+      </section>
+
+      {recentActivity.isLoading && !recentActivity.data ? (
+        <SectionSkeleton className="min-h-[320px]" />
+      ) : recentActivity.error ? (
+        <ErrorCard
+          title="Unable to load recent activity"
+          description={
+            (recentActivity.error as ApiRequestError).message ??
+            "The recent activity feed is temporarily unavailable."
+          }
+          onRetry={() => void recentActivity.mutate()}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>
+              Last 10 add() requests observed in the tenant quality stream.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Time</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(recentActivity.data ?? []).length > 0 ? (
+                  recentActivity.data?.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="text-slate-600">
+                        {formatRelativeTime(row.time)}
+                      </TableCell>
+                      <TableCell className="font-medium text-slate-900">
+                        {row.user}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={getStatusClassName(row.status)}
+                        >
+                          {getStatusLabel(row.status)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      className="py-10 text-center text-slate-500"
+                      colSpan={3}
+                    >
+                      No recent tenant activity yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
