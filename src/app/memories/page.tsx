@@ -6,6 +6,7 @@ import useSWR from "swr";
 import { Archive, Brain, FolderOpen, Star } from "lucide-react";
 
 import { MetricCard } from "@/components/metric-card";
+import { SdkQuickstart } from "@/components/sdk-quickstart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -133,6 +134,10 @@ export default function MemoriesPage() {
         />
       </section>
 
+      {metrics.total === 0 && !memories.isLoading && !memories.error ? (
+        <SdkQuickstart emptyState />
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Latest memory records</CardTitle>
@@ -192,7 +197,7 @@ export default function MemoriesPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-slate-500">
-                      No memories found for this workspace yet.
+                      No memories yet. Follow the quick start above.
                     </TableCell>
                   </TableRow>
                 )}

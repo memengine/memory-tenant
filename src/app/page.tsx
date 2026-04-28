@@ -9,6 +9,7 @@ import { GateDonutChart } from "@/components/charts/gate-donut-chart";
 import { MemoryLineChart } from "@/components/charts/memory-line-chart";
 import { MetricCard } from "@/components/metric-card";
 import { QuotaBar } from "@/components/quota-bar";
+import { SdkQuickstart } from "@/components/sdk-quickstart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -239,6 +240,8 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <SdkQuickstart emptyState={metrics.memoriesStored === 0} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
