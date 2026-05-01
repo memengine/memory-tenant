@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
-import { AlertTriangle, Database, ShieldBan, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Database,
+  Download,
+  ShieldBan,
+  Trash2,
+} from "lucide-react";
 
 import { MemoryList } from "@/components/memory-list";
 import { MetricCard } from "@/components/metric-card";
@@ -36,6 +42,8 @@ type MemoryPayload = {
   nextCursor: string | null;
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
 function formatDateTime(value: string | null): string {
   if (!value) {
     return "Never";
@@ -59,6 +67,10 @@ export default function UserDetailPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportAcknowledged, setExportAcknowledged] = useState(false);
 
   useEffect(() => {
     setMemoryPageCount(1);
@@ -111,7 +123,7 @@ export default function UserDetailPage() {
   }
 
   async function handleDeleteAll() {
-    if (deleteConfirmation !== "DELETE") {
+    if (deleteConfirmation !== "DELETE" || !exportAcknowledged) {
       return;
     }
     setDeletingAll(true);
@@ -120,6 +132,71 @@ export default function UserDetailPage() {
       router.push("/users");
     } finally {
       setDeletingAll(false);
+    }
+  }
+
+  async function handleExportUserData() {
+    if (!API_BASE) {
+      setExportError("NEXT_PUBLIC_API_BASE is not configured.");
+      return;
+    }
+
+    setExporting(true);
+    setExportMessage(null);
+    setExportError(null);
+
+    try {
+      const token = await getToken();
+      const response = await fetch(
+        `${API_BASE}/v1/users/${encodeURIComponent(externalUserId)}/export`,
+        {
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+
+      if (response.status === 429) {
+        setExportError("Export already requested today. Please wait 24 hours.");
+        return;
+      }
+
+      if (!response.ok) {
+        let message = `Export failed with status ${response.status}`;
+        try {
+          const payload = (await response.json()) as {
+            error?: string;
+            detail?: string;
+          };
+          message = payload.error ?? payload.detail ?? message;
+        } catch {
+          // Keep the default message.
+        }
+        throw new Error(message);
+      }
+
+      const exportJson = await response.json();
+      const blob = new Blob([JSON.stringify(exportJson, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const date = new Date().toISOString().slice(0, 10);
+      anchor.href = url;
+      anchor.download = `memoryos-export-${externalUserId}-${date}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setExportMessage("Export downloaded. Review before deleting.");
+    } catch (caught) {
+      setExportError(
+        caught instanceof Error ? caught.message : "Unable to export user data.",
+      );
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -139,7 +216,7 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Badge
             variant="outline"
             className={
@@ -150,12 +227,31 @@ export default function UserDetailPage() {
           >
             {user.data?.block_history.length ? "Review recommended" : "Healthy"}
           </Badge>
+          <Button
+            variant="outline"
+            onClick={() => void handleExportUserData()}
+            disabled={exporting}
+          >
+            <Download className="mr-2 size-4" />
+            {exporting ? "Preparing export..." : "Export User Data"}
+          </Button>
           <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
             <Trash2 className="mr-2 size-4" />
-            GDPR Delete All
+            Delete All Memories
           </Button>
         </div>
       </div>
+
+      {exportMessage ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
+          {exportMessage}
+        </div>
+      ) : null}
+      {exportError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">
+          {exportError}
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <MetricCard
@@ -266,6 +362,7 @@ export default function UserDetailPage() {
           <DialogHeader>
             <DialogTitle>GDPR delete all memories</DialogTitle>
             <DialogDescription>
+              Have you exported this user's data first? This cannot be undone.
               Type DELETE to remove this user and all associated memories permanently.
             </DialogDescription>
           </DialogHeader>
@@ -274,10 +371,23 @@ export default function UserDetailPage() {
             onChange={(event) => setDeleteConfirmation(event.target.value)}
             placeholder='Type "DELETE" to confirm'
           />
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={exportAcknowledged}
+              onChange={(event) => setExportAcknowledged(event.target.checked)}
+            />
+            <span>I have exported or do not need the data</span>
+          </label>
           <DialogFooter showCloseButton>
             <Button
               variant="destructive"
-              disabled={deleteConfirmation !== "DELETE" || deletingAll}
+              disabled={
+                deleteConfirmation !== "DELETE" ||
+                !exportAcknowledged ||
+                deletingAll
+              }
               onClick={() => void handleDeleteAll()}
             >
               {deletingAll ? "Deleting..." : "Delete all"}

@@ -9,6 +9,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Menu,
+  Sparkles,
   Settings,
   ShieldAlert,
   Users,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/memories", label: "Memories", icon: Brain },
+  { href: "/playground", label: "Playground", icon: Sparkles },
   { href: "/users", label: "Users", icon: Users },
   { href: "/quality-log", label: "Quality Log", icon: ShieldAlert },
   { href: "/api-keys", label: "API Keys", icon: KeyRound },

@@ -3,7 +3,14 @@
 import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
-import { Activity, Database, ShieldAlert, Users } from "lucide-react";
+import {
+  Activity,
+  CheckCircle,
+  Database,
+  GitMerge,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
 
 import { GateDonutChart } from "@/components/charts/gate-donut-chart";
 import { MemoryLineChart } from "@/components/charts/memory-line-chart";
@@ -113,6 +120,80 @@ function getStatusLabel(status: "queued" | "blocked" | "passthrough") {
   return "Queued";
 }
 
+type UsageWithEngineMetrics = {
+  conflicts_resolved_mtd?: number;
+  extraction_success_rate?: number;
+};
+
+function EngineMetricCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+  loading,
+  error,
+  onRetry,
+  tooltip,
+  tone,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  icon: typeof GitMerge;
+  loading: boolean;
+  error?: string;
+  onRetry: () => void;
+  tooltip: string;
+  tone: "gray" | "purple" | "green" | "amber" | "red";
+}) {
+  const toneClassName =
+    tone === "purple"
+      ? "bg-purple-100 text-purple-700"
+      : tone === "green"
+        ? "bg-emerald-100 text-emerald-700"
+        : tone === "amber"
+          ? "bg-amber-100 text-amber-700"
+          : tone === "red"
+            ? "bg-rose-100 text-rose-700"
+            : "bg-slate-100 text-slate-700";
+
+  return (
+    <Card className="min-h-[170px]" title={tooltip}>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div className="space-y-1">
+          <CardDescription>{title}</CardDescription>
+          <CardTitle className="text-base text-slate-950">{title}</CardTitle>
+        </div>
+        <div className={`rounded-xl p-2.5 ${toneClassName}`}>
+          <Icon className="size-4" />
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col justify-end">
+        {loading ? (
+          <div className="space-y-3">
+            <div className="h-8 w-28 animate-pulse rounded bg-slate-200" />
+            <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+          </div>
+        ) : error ? (
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-rose-700">{error}</div>
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-3xl font-semibold tracking-tight text-slate-950">
+              {value}
+            </div>
+            <p className="text-sm text-slate-600">{description}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OverviewPage() {
   const { isLoaded, getToken } = useAuth();
   const [renderedAt] = useState(() => Date.now());
@@ -188,6 +269,12 @@ export default function OverviewPage() {
       quotaUsedPct,
       activeUsers30d,
       gateBlockRate,
+      conflictsResolvedMtd:
+        (usage.data as (typeof usage.data & UsageWithEngineMetrics) | undefined)
+          ?.conflicts_resolved_mtd ?? 0,
+      extractionSuccessRate:
+        (usage.data as (typeof usage.data & UsageWithEngineMetrics) | undefined)
+          ?.extraction_success_rate ?? 0,
     };
   }, [additions.data, gateBreakdown.data, renderedAt, usage.data, users.data]);
 
@@ -243,7 +330,7 @@ export default function OverviewPage() {
 
       <SdkQuickstart emptyState={metrics.memoriesStored === 0} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           title="Memories Stored"
           value={metrics.memoriesStored.toLocaleString("en-IN")}
@@ -288,6 +375,34 @@ export default function OverviewPage() {
             void additions.mutate();
             void gateBreakdown.mutate();
           }}
+        />
+        <EngineMetricCard
+          title="Conflicts Resolved"
+          value={metrics.conflictsResolvedMtd.toLocaleString("en-IN")}
+          description="this month - memory kept accurate"
+          icon={GitMerge}
+          loading={usage.isLoading && !usage.data}
+          error={usageError?.message}
+          onRetry={() => void usage.mutate()}
+          tooltip="When a new memory contradicts an existing one, MemoryOS resolves the conflict automatically."
+          tone={metrics.conflictsResolvedMtd > 0 ? "purple" : "gray"}
+        />
+        <EngineMetricCard
+          title="Extraction Success Rate"
+          value={formatPercent(metrics.extractionSuccessRate * 100)}
+          description="of add() calls produced memories"
+          icon={CheckCircle}
+          loading={usage.isLoading && !usage.data}
+          error={usageError?.message}
+          onRetry={() => void usage.mutate()}
+          tooltip="The percentage of queued add() calls that successfully extracted at least one memory."
+          tone={
+            metrics.extractionSuccessRate > 0.7
+              ? "green"
+              : metrics.extractionSuccessRate >= 0.5
+                ? "amber"
+                : "red"
+          }
         />
       </section>
 
