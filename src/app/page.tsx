@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
@@ -8,11 +9,18 @@ import {
   CheckCircle,
   Database,
   GitMerge,
+  Info,
   ShieldAlert,
   Users,
+  X,
+  Zap,
 } from "lucide-react";
 
 import { GateDonutChart } from "@/components/charts/gate-donut-chart";
+import {
+  DOMAIN_SELECTION_STORAGE_KEY,
+  DomainSelectionModal,
+} from "@/components/domain-selection-modal";
 import { MemoryLineChart } from "@/components/charts/memory-line-chart";
 import { MetricCard } from "@/components/metric-card";
 import { QuotaBar } from "@/components/quota-bar";
@@ -43,6 +51,8 @@ import {
   getRecentActivity,
   getTenantUsage,
 } from "@/lib/api";
+import { useConflictStats } from "@/hooks/useConflictStats";
+import { useDomainSchema } from "@/hooks/useDomainSchema";
 
 function ErrorCard({
   title,
@@ -120,11 +130,6 @@ function getStatusLabel(status: "queued" | "blocked" | "passthrough") {
   return "Queued";
 }
 
-type UsageWithEngineMetrics = {
-  conflicts_resolved_mtd?: number;
-  extraction_success_rate?: number;
-};
-
 function EngineMetricCard({
   title,
   value,
@@ -197,6 +202,28 @@ function EngineMetricCard({
 export default function OverviewPage() {
   const { isLoaded, getToken } = useAuth();
   const [renderedAt] = useState(() => Date.now());
+  const [conflictsBannerDismissed, setConflictsBannerDismissed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.sessionStorage.getItem("conflicts_banner_dismissed") === "true",
+  );
+  const [nothingExtractAdvisoryDismissed, setNothingExtractAdvisoryDismissed] =
+    useState(
+      () =>
+        typeof window !== "undefined" &&
+        window.sessionStorage.getItem("nothing_extract_advisory_dismissed") ===
+          "true",
+    );
+  const [domainSelectionOpen, setDomainSelectionOpen] = useState(false);
+  const [domainSelectionCompleted, setDomainSelectionCompleted] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(DOMAIN_SELECTION_STORAGE_KEY) === "true",
+  );
+  const [domainToast, setDomainToast] = useState<{
+    message: string;
+    tone: "success" | "info";
+  } | null>(null);
   const swrKeyReady = isLoaded ? "ready" : null;
 
   const usage = useSWR(
@@ -222,6 +249,9 @@ export default function OverviewPage() {
     () => getGateBreakdown(getToken),
     { refreshInterval: 30_000 },
   );
+
+  const conflictStats = useConflictStats();
+  const domain = useDomainSchema();
 
   const recentActivity = useSWR(
     swrKeyReady && usage.data ? ["recent-activity", usage.data.mode] : null,
@@ -269,29 +299,108 @@ export default function OverviewPage() {
       quotaUsedPct,
       activeUsers30d,
       gateBlockRate,
-      conflictsResolvedMtd:
-        (usage.data as (typeof usage.data & UsageWithEngineMetrics) | undefined)
-          ?.conflicts_resolved_mtd ?? 0,
-      extractionSuccessRate:
-        (usage.data as (typeof usage.data & UsageWithEngineMetrics) | undefined)
-          ?.extraction_success_rate ?? 0,
+      conflictsResolvedMtd: usage.data?.conflicts_resolved_mtd ?? 0,
+      extractionSuccessRate: usage.data?.extraction_success_rate ?? 0,
+      nothingToExtractRate: usage.data?.nothing_to_extract_rate ?? 0,
     };
   }, [additions.data, gateBreakdown.data, renderedAt, usage.data, users.data]);
 
   const usageError = usage.error as ApiRequestError | undefined;
   const usersError = users.error as ApiRequestError | undefined;
+  const conflictStatsError = conflictStats.error as ApiRequestError | undefined;
+  const pendingTenantReview =
+    conflictStats.data?.pending_tenant_review ??
+    conflictStats.data?.requires_attention ??
+    0;
+  const pendingUserSession = conflictStats.data?.pending_user_session ?? 0;
+  const autoResolvedMtd = conflictStats.data?.auto_resolved_mtd ?? 0;
+
+  const shouldShowInitialDomainSelection =
+    isLoaded &&
+    !users.isLoading &&
+    !domain.isLoading &&
+    !domain.error &&
+    metrics.memoriesStored === 0 &&
+    domain.domainSchema === null &&
+    !domainSelectionCompleted;
+  const showDomainSelection =
+    domainSelectionOpen || shouldShowInitialDomainSelection;
+
+  function handleDomainSelectionClose() {
+    setDomainSelectionOpen(false);
+    setDomainSelectionCompleted(
+      window.localStorage.getItem(DOMAIN_SELECTION_STORAGE_KEY) === "true",
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
+      <DomainSelectionModal
+        open={showDomainSelection}
+        onClose={handleDomainSelectionClose}
+        onNotice={(message, tone) => {
+          setDomainToast({ message, tone });
+          window.setTimeout(() => setDomainToast(null), 4500);
+        }}
+        onSelected={() => {
+          setDomainSelectionCompleted(true);
+          void domain.mutate();
+          void usage.mutate();
+          void users.mutate();
+          void additions.mutate();
+        }}
+      />
+      {domainToast ? (
+        <div
+          className={
+            domainToast.tone === "success"
+              ? "fixed bottom-6 right-6 z-[80] rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg"
+              : "fixed bottom-6 right-6 z-[80] rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-lg"
+          }
+        >
+          {domainToast.message}
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
           Tenant Overview
         </span>
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-              MemoryOS control surface
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+                MemoryOS control surface
+              </h1>
+              <Badge
+                variant="outline"
+                className={
+                  domain.domainSchema === "edtech"
+                    ? "border-sky-200 bg-sky-50 text-sky-700"
+                    : "border-slate-200 bg-slate-100 text-slate-700"
+                }
+              >
+                {domain.domainSchema === "edtech"
+                  ? "🎓 EdTech Schema"
+                  : "⚙️ General Engine"}
+              </Badge>
+              {domain.domainSchema === "edtech" ? (
+                <Link
+                  href="/settings#domain"
+                  className="text-sm font-medium text-sky-700 hover:text-sky-900"
+                >
+                  Change -&gt;
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="text-sm font-medium text-sky-700 hover:text-sky-900"
+                  onClick={() => setDomainSelectionOpen(true)}
+                >
+                  Switch to domain -&gt;
+                </button>
+              )}
+            </div>
             <p className="max-w-3xl text-sm text-slate-600 sm:text-base">
               Monitor tenant usage, memory growth, and quality gate behavior in
               one place.
@@ -376,6 +485,19 @@ export default function OverviewPage() {
             void gateBreakdown.mutate();
           }}
         />
+        {autoResolvedMtd > 0 ? (
+          <EngineMetricCard
+            title="Auto-Resolved Conflicts"
+            value={autoResolvedMtd.toLocaleString("en-IN")}
+            description="conflicts handled automatically this month"
+            icon={Zap}
+            loading={conflictStats.isLoading && !conflictStats.data}
+            error={conflictStatsError?.message}
+            onRetry={() => void conflictStats.mutate()}
+            tooltip="MemoryOS detects when users have conflicting information and resolves it automatically using recency and confidence signals."
+            tone="green"
+          />
+        ) : null}
         <EngineMetricCard
           title="Conflicts Resolved"
           value={metrics.conflictsResolvedMtd.toLocaleString("en-IN")}
@@ -401,10 +523,125 @@ export default function OverviewPage() {
               ? "green"
               : metrics.extractionSuccessRate >= 0.5
                 ? "amber"
-                : "red"
+            : "red"
           }
         />
+        <EngineMetricCard
+          title="Nothing to Extract Rate"
+          value={formatPercent(metrics.nothingToExtractRate * 100)}
+          description="conversations with no storable information"
+          icon={Info}
+          loading={usage.isLoading && !usage.data}
+          error={usageError?.message}
+          onRetry={() => void usage.mutate()}
+          tooltip="These conversations passed the quality gate but contained no facts worth storing, such as greetings, acknowledgements, or off-topic messages. This is normal and expected."
+          tone="gray"
+        />
       </section>
+
+      {metrics.nothingToExtractRate > 0.4 && !nothingExtractAdvisoryDismissed ? (
+        <Card className="border border-amber-200 bg-amber-50 text-amber-950">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <Info className="size-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">
+                  More than 40% of conversations have nothing to store.
+                </div>
+                <p className="max-w-3xl text-sm leading-6 text-amber-900/85">
+                  This may mean your users are having very short or off-topic
+                  conversations. Review the Quality Log for examples.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Dismiss nothing-to-extract advisory"
+              onClick={() => {
+                window.sessionStorage.setItem(
+                  "nothing_extract_advisory_dismissed",
+                  "true",
+                );
+                setNothingExtractAdvisoryDismissed(true);
+              }}
+            >
+              <X className="size-4" />
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {pendingTenantReview > 0 ? (
+        <Card className="border border-amber-300 bg-amber-50 text-amber-950">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <Info className="size-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">
+                  {pendingTenantReview === 1
+                    ? "1 conflict needs your input"
+                    : `${pendingTenantReview.toLocaleString("en-IN")} conflicts need your input`}
+                </div>
+                <p className="max-w-3xl text-sm leading-6 text-amber-900/85">
+                  These involve shared team information only you can verify.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button asChild variant="outline" className="border-amber-300 bg-white">
+                <Link href="/conflicts#tenant-review">Review now -&gt;</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : pendingUserSession > 0 && !conflictsBannerDismissed ? (
+        <Card className="border border-sky-200 bg-sky-50 text-sky-950">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                <Info className="size-5" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-sm font-semibold">
+                  {pendingUserSession === 1
+                    ? "1 conflict is being resolved automatically"
+                    : `${pendingUserSession.toLocaleString("en-IN")} conflicts are being resolved automatically`}
+                </div>
+                <p className="max-w-3xl text-sm leading-6 text-sky-900/85">
+                  MemoryOS is handling these through user conversations. No
+                  action needed.
+                </p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button asChild variant="outline" className="border-sky-200 bg-white">
+                <Link href="/conflicts">See details -&gt;</Link>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Dismiss user-session conflicts alert"
+                onClick={() => {
+                  window.sessionStorage.setItem(
+                    "conflicts_banner_dismissed",
+                    "true",
+                  );
+                  setConflictsBannerDismissed(true);
+                }}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <QuotaBar
         loading={usage.isLoading && !usage.data}
