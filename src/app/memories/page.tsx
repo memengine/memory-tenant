@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
@@ -132,8 +133,23 @@ function getOriginalImportance(memory: MemoryExplorerRecord): number {
 function ImportanceScore({ memory }: { memory: MemoryExplorerRecord }) {
   const original = getOriginalImportance(memory);
   const current = memory.importance_score;
-  const increased = current > original;
-  const decreased = current < original;
+  const delta = current - original;
+  const increased = delta > 0;
+  const decreased = delta < 0;
+  const trend =
+    delta > 0.3 ? "rising" : delta < -0.3 ? "decaying" : "stable";
+  const trendClassName =
+    trend === "rising"
+      ? "text-emerald-700"
+      : trend === "decaying"
+        ? "text-rose-700"
+        : "text-slate-500";
+  const trendLabel =
+    trend === "rising"
+      ? "↑ rising"
+      : trend === "decaying"
+        ? "↓ decaying"
+        : "→ stable";
 
   return (
     <div className="space-y-1">
@@ -155,6 +171,9 @@ function ImportanceScore({ memory }: { memory: MemoryExplorerRecord }) {
         ) : null}
       </div>
       <div className="text-xs text-slate-500">orig: {original.toFixed(1)}</div>
+      <div className={`text-xs font-medium ${trendClassName}`}>
+        {trendLabel}
+      </div>
     </div>
   );
 }
@@ -317,6 +336,15 @@ export default function MemoriesPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-3 text-sm text-slate-700">
+            Not seeing expected memories?{" "}
+            <Link
+              href="/quality-log?status=nothing_to_extract"
+              className="font-semibold text-sky-700 hover:text-sky-900"
+            >
+              Check if conversations had nothing to extract -&gt;
+            </Link>
+          </div>
           {memories.isLoading && !memories.data ? (
             <div className="space-y-3">
               <div className="h-10 animate-pulse rounded-xl bg-slate-200" />
