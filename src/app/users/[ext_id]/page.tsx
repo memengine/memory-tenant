@@ -362,7 +362,7 @@ export default function UserDetailPage() {
           <DialogHeader>
             <DialogTitle>GDPR delete all memories</DialogTitle>
             <DialogDescription>
-              Have you exported this user's data first? This cannot be undone.
+              Have you exported this user&apos;s data first? This cannot be undone.
               Type DELETE to remove this user and all associated memories permanently.
             </DialogDescription>
           </DialogHeader>

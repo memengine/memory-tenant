@@ -6,6 +6,8 @@ import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import {
   Activity,
   Brain,
+  GitMerge,
+  GraduationCap,
   KeyRound,
   LayoutDashboard,
   Menu,
@@ -22,6 +24,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useConflictStats } from "@/hooks/useConflictStats";
+import { useDomainSchema } from "@/hooks/useDomainSchema";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -30,6 +34,7 @@ const navItems = [
   { href: "/playground", label: "Playground", icon: Sparkles },
   { href: "/users", label: "Users", icon: Users },
   { href: "/quality-log", label: "Quality Log", icon: ShieldAlert },
+  { href: "/conflicts", label: "Conflicts", icon: GitMerge },
   { href: "/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
@@ -44,10 +49,21 @@ function isActivePath(pathname: string, href: string): boolean {
 
 function SidebarNav() {
   const pathname = usePathname();
+  const conflictStats = useConflictStats();
+  const domain = useDomainSchema();
+  const requiresAttention = conflictStats.data?.requires_attention ?? 0;
+  const items =
+    domain.domainSchema === "edtech"
+      ? [
+          ...navItems.slice(0, 4),
+          { href: "/students", label: "Students", icon: GraduationCap },
+          ...navItems.slice(4),
+        ]
+      : navItems;
 
   return (
     <nav className="flex flex-col gap-1.5">
-      {navItems.map((item) => {
+      {items.map((item) => {
         const active = isActivePath(pathname, item.href);
         const Icon = item.icon;
 
@@ -64,6 +80,14 @@ function SidebarNav() {
           >
             <Icon className="size-4" />
             <span>{item.label}</span>
+            {item.href === "/conflicts" && requiresAttention > 0 ? (
+              <span
+                aria-label={`${requiresAttention} conflicts need attention`}
+                className="ml-auto min-w-5 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-amber-800"
+              >
+                {requiresAttention > 9 ? "9+" : requiresAttention}
+              </span>
+            ) : null}
           </Link>
         );
       })}

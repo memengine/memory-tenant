@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Info } from "lucide-react";
 
 import type { QualityLogEntry } from "@/lib/api";
 import { truncateUserId } from "@/lib/api";
@@ -23,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-type LayerFilter = "ALL" | "L1" | "L2" | "L3" | "L4";
+type LayerFilter = "ALL" | "L1" | "L2" | "L3" | "L4" | "NOTHING_TO_EXTRACT";
 type DateRangeFilter = "24h" | "7d" | "30d";
 
 type QualityLogTableProps = {
@@ -58,6 +59,14 @@ function qualityBadgeClass(score: number): string {
   return "border-rose-200 bg-rose-100 text-rose-800";
 }
 
+function isNothingToExtract(entry: QualityLogEntry): boolean {
+  return (
+    entry.nothing_to_extract === true ||
+    (entry.layer_blocked_at === "NONE" &&
+      /nothing[\s_-]*to[\s_-]*extract/i.test(entry.reason ?? ""))
+  );
+}
+
 export function QualityLogTable({
   rows,
   loading,
@@ -81,6 +90,9 @@ export function QualityLogTable({
             <SelectItem value="L2">L2</SelectItem>
             <SelectItem value="L3">L3</SelectItem>
             <SelectItem value="L4">L4</SelectItem>
+            <SelectItem value="NOTHING_TO_EXTRACT">
+              Passed - nothing to extract
+            </SelectItem>
           </SelectContent>
         </Select>
 
@@ -124,44 +136,71 @@ export function QualityLogTable({
             </TableHeader>
             <TableBody>
               {rows.length > 0 ? (
-                rows.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="text-slate-600">{formatDateTime(entry.created_at)}</TableCell>
-                    <TableCell className="font-medium text-slate-900">
-                      <Link
-                        href={`/users/${encodeURIComponent(entry.external_user_id)}`}
-                        className="hover:text-sky-700"
-                      >
-                        {truncateUserId(entry.external_user_id)}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={
-                          entry.layer_blocked_at === "NONE"
-                            ? "border-emerald-200 bg-emerald-100 text-emerald-800"
-                            : "border-amber-200 bg-amber-100 text-amber-800"
-                        }
-                      >
-                        {entry.layer_blocked_at}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs text-sm text-slate-600">
-                      {(entry.reason ?? "").trim() || "No reason captured"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(qualityBadgeClass(entry.quality_score))}>
-                        {entry.quality_score.toFixed(2)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {entry.layer_blocked_at === "L3" && entry.semantic_similarity !== null
-                        ? entry.semantic_similarity.toFixed(2)
-                        : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))
+                rows.map((entry) => {
+                  const nothingToExtract = isNothingToExtract(entry);
+
+                  return (
+                    <TableRow
+                      key={entry.id}
+                      className={nothingToExtract ? "bg-emerald-50/30" : undefined}
+                    >
+                      <TableCell className="text-slate-600">{formatDateTime(entry.created_at)}</TableCell>
+                      <TableCell className="font-medium text-slate-900">
+                        <Link
+                          href={`/users/${encodeURIComponent(entry.external_user_id)}`}
+                          className="hover:text-sky-700"
+                        >
+                          {truncateUserId(entry.external_user_id)}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {nothingToExtract ? (
+                          <span className="text-sm font-medium text-emerald-700">
+                            None - passed all gates
+                          </span>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className={
+                              entry.layer_blocked_at === "NONE"
+                                ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                                : "border-amber-200 bg-amber-100 text-amber-800"
+                            }
+                          >
+                            {entry.layer_blocked_at}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-xs text-sm text-slate-600">
+                        {nothingToExtract ? (
+                          <span className="inline-flex items-center gap-2 text-slate-600">
+                            Nothing to extract
+                            <span
+                              title="This conversation passed all quality gates but the LLM found no facts worth storing. Common causes: greeting messages, one-word responses, or off-topic questions."
+                            >
+                              <Info
+                                className="size-4 text-slate-400"
+                                aria-label="Nothing to extract explanation"
+                              />
+                            </span>
+                          </span>
+                        ) : (
+                          (entry.reason ?? "").trim() || "No reason captured"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(qualityBadgeClass(entry.quality_score))}>
+                          {entry.quality_score.toFixed(2)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {entry.layer_blocked_at === "L3" && entry.semantic_similarity !== null
+                          ? entry.semantic_similarity.toFixed(2)
+                          : "-"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-slate-500">

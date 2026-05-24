@@ -18,6 +18,15 @@ export type QuotaMode =
   | "DEGRADED_RETRIEVE"
   | "BLOCKED";
 
+export type ConflictType =
+  | "FACT_UPDATE"
+  | "PREFERENCE_CHANGE"
+  | "NEGATION"
+  | "SKILL_PROGRESSION"
+  | "NUMERIC_UPDATE"
+  | "TEMPORAL_SHIFT"
+  | "UNKNOWN";
+
 export type TenantUsage = {
   calls_used: number;
   calls_limit: number | null;
@@ -27,6 +36,77 @@ export type TenantUsage = {
   budget_remaining_pct: number;
   reset_at: string | null;
   plan_tier: "free" | "starter" | "growth" | "enterprise";
+  conflicts_resolved_mtd?: number;
+  extraction_success_rate?: number;
+  nothing_to_extract_rate?: number;
+  cross_user_conflicts_pending?: number;
+  conflict_types_breakdown?: Partial<Record<ConflictType, number>>;
+};
+
+export type SharedContextConflictStatus =
+  | "pending"
+  | "clarification_queued"
+  | "resolved"
+  | "ignored";
+
+export type SharedContextConflict = {
+  id: string;
+  detected_at: string;
+  status: SharedContextConflictStatus;
+  entity_type:
+    | "tech_stack"
+    | "company_fact"
+    | "product_feature"
+    | "team_process"
+    | "shared_goal"
+    | "organisation_policy"
+    | "team_language"
+    | "shared_resource"
+    | "exam_date"
+    | "grade_level"
+    | "personal_skill"
+    | "personal_preference"
+    | "individual_goal"
+    | "learning_style"
+    | "personal_fact"
+    | "marks_target"
+    | "study_schedule";
+  entity_value_a: string;
+  entity_value_b: string;
+  user_a_id: string | null;
+  user_b_id: string | null;
+  user_a_memory_id?: string | null;
+  user_b_memory_id?: string | null;
+  memory_a_content: string | null;
+  memory_b_content: string | null;
+  memory_a_created_at?: string | null;
+  memory_b_created_at?: string | null;
+  resolved_at?: string | null;
+  resolution?: "A" | "B" | "both_valid" | null;
+  resolution_path?: "user_session" | "tenant_review" | null;
+  resolved_by?: "user_session" | "tenant" | null;
+  resolution_reason?: string | null;
+  auto_resolution?: string | null;
+  auto_resolution_at?: string | null;
+  requires_attention?: boolean;
+};
+
+export type ConflictStats = {
+  total_detected_mtd: number;
+  auto_resolved_mtd: number;
+  auto_resolution_rate: number;
+  resolution_breakdown: {
+    per_user_scoped: number;
+    recency_weighted: number;
+    confidence_weighted: number;
+    clarification_queued: number;
+  };
+  requires_attention: number;
+  clarifications_pending: number;
+  pending_user_session: number;
+  pending_tenant_review: number;
+  resolved_by_user_session_mtd: number;
+  resolved_by_tenant_mtd: number;
 };
 
 export type TenantUser = {
@@ -75,6 +155,32 @@ export type TenantSettings = {
   overage_policy: "block" | "warn" | "charge";
 };
 
+export type DomainSchemaValue = "edtech" | null;
+
+export type AvailableDomain = {
+  value: string | null;
+  label: string;
+  description: string;
+  status: "available" | "coming_soon";
+};
+
+export type TenantDomainSchema = {
+  domain_schema: DomainSchemaValue;
+  available_domains: AvailableDomain[];
+};
+
+export type TenantStudentSummary = {
+  external_user_id: string;
+  grade_level: string | null;
+  board_or_curriculum: string | null;
+  exam_name: string | null;
+  exam_date: string | null;
+  days_to_exam: number | null;
+  weak_topics_count: number;
+  forgetting_risk_count: number;
+  last_session_at: string | null;
+};
+
 export type DeprecationUsageEntry = {
   field: string;
   last_used: string;
@@ -88,6 +194,7 @@ export type QualityLogEntry = {
   external_user_id: string;
   layer_blocked_at: "L1" | "L2" | "L3" | "L4" | "NONE";
   reason?: string | null;
+  nothing_to_extract?: boolean;
   quality_score: number;
   semantic_similarity: number | null;
   created_at: string;
@@ -138,14 +245,40 @@ export type MemoryRecord = {
   content: string;
   category: string;
   importance_score: number;
+  original_importance_score?: number | null;
   confidence_score: number;
   created_at: string | null;
   updated_at: string | null;
   last_accessed_at: string | null;
   access_count: number;
+  is_hot?: boolean;
   is_archived: boolean;
+  system_archived?: boolean;
+  source_job_id?: string | null;
   agent_id: string | null;
   metadata: Record<string, unknown>;
+};
+
+export type RetrieveContextFormat = "bullets" | "json" | "xml";
+
+export type RetrieveMemoriesRequest = {
+  external_user_id: string;
+  query: string;
+  limit?: number;
+  categories?: string[];
+  agent_id?: string | null;
+  time_filter_days?: number | null;
+  format?: RetrieveContextFormat;
+  context_max_tokens?: number;
+};
+
+export type RetrieveMemoriesResponse = {
+  data: MemoryRecord[];
+  system_prompt_addition: string;
+  context_token_count?: number;
+  memories_from_hot_tier?: number;
+  clarification_question?: string | null;
+  cached?: boolean;
 };
 
 type Envelope<T> = {
@@ -235,6 +368,79 @@ export async function getTenantUsage(getToken: TokenGetter): Promise<TenantUsage
   return response.data;
 }
 
+export async function getTenantDomainSchema(
+  getToken: TokenGetter,
+): Promise<TenantDomainSchema> {
+  const response = await apiFetch<Envelope<TenantDomainSchema>>(
+    "/v1/tenant/domain-schema",
+    getToken,
+  );
+  return response.data;
+}
+
+export async function updateTenantDomainSchema(
+  getToken: TokenGetter,
+  domainSchema: DomainSchemaValue,
+): Promise<TenantDomainSchema> {
+  const response = await apiFetch<Envelope<TenantDomainSchema>>(
+    "/v1/tenant/domain-schema",
+    getToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ domain_schema: domainSchema }),
+    },
+  );
+  return response.data;
+}
+
+export async function getSharedContextConflicts(
+  getToken: TokenGetter,
+): Promise<SharedContextConflict[]> {
+  const response = await apiFetch<Envelope<SharedContextConflict[]>>(
+    "/v1/tenant/shared-context-conflicts?include_resolved=true",
+    getToken,
+  );
+  return response.data;
+}
+
+export async function getConflictStats(getToken: TokenGetter): Promise<ConflictStats> {
+  const response = await apiFetch<Envelope<ConflictStats>>(
+    "/v1/tenant/conflict-stats",
+    getToken,
+  );
+  return response.data;
+}
+
+export async function updateSharedContextConflict(
+  getToken: TokenGetter,
+  conflictId: string,
+  payload: { status: "ignored" },
+): Promise<SharedContextConflict> {
+  const response = await apiFetch<Envelope<SharedContextConflict | SharedContextConflict[]>>(
+    `/v1/tenant/shared-context-conflicts/${encodeURIComponent(conflictId)}`,
+    getToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+  return Array.isArray(response.data) ? response.data[0] : response.data;
+}
+
+export async function resolveTenantConflict(
+  getToken: TokenGetter,
+  conflictId: string,
+  payload: { correct_user: "A" | "B" | "both_valid"; reason?: string },
+): Promise<{ resolved: boolean; conflict_id: string; action_taken: string }> {
+  const response = await apiFetch<
+    Envelope<{ resolved: boolean; conflict_id: string; action_taken: string }>
+  >(`/v1/tenant/conflicts/${encodeURIComponent(conflictId)}/resolve`, getToken, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return response.data;
+}
+
 export async function getTenantUsersPage(
   getToken: TokenGetter,
   options?: { cursor?: string | null; limit?: number; search?: string },
@@ -260,6 +466,23 @@ export async function getTenantCostSummary(
     getToken,
   );
   return response.data;
+}
+
+export async function getTenantStudentsPage(
+  getToken: TokenGetter,
+  options?: { cursor?: string | null; limit?: number },
+): Promise<PaginatedResponse<TenantStudentSummary>> {
+  const search = new URLSearchParams({
+    limit: String(options?.limit ?? 50),
+  });
+  if (options?.cursor) {
+    search.set("cursor", options.cursor);
+  }
+
+  return apiFetch<PaginatedResponse<TenantStudentSummary>>(
+    `/v1/tenant/students?${search.toString()}`,
+    getToken,
+  );
 }
 
 export async function getAllTenantUsers(
@@ -577,6 +800,41 @@ export async function listMemories(
     `/v1/memories?${search.toString()}`,
     getToken,
   );
+}
+
+export async function retrieveMemories(
+  getToken: TokenGetter,
+  payload: RetrieveMemoriesRequest,
+): Promise<RetrieveMemoriesResponse> {
+  const body: Record<string, unknown> = {
+    external_user_id: payload.external_user_id,
+    query: payload.query,
+    limit: payload.limit ?? 10,
+    format: payload.format ?? "bullets",
+    context_max_tokens: payload.context_max_tokens ?? 500,
+  };
+  if (payload.categories?.length) {
+    body.categories = payload.categories;
+  }
+  if (payload.agent_id) {
+    body.agent_id = payload.agent_id;
+  }
+  if (payload.time_filter_days !== undefined && payload.time_filter_days !== null) {
+    body.time_filter_days = payload.time_filter_days;
+  }
+
+  const response = await apiFetch<RetrieveMemoriesResponse | Envelope<RetrieveMemoriesResponse>>(
+    "/v1/memories/retrieve",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+  );
+
+  return "data" in response && !Array.isArray(response.data) && typeof response.data === "object"
+    ? response.data
+    : (response as RetrieveMemoriesResponse);
 }
 
 export async function deleteMemory(

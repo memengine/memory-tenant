@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { AlertTriangle, Gauge, Layers3, ShieldAlert, X } from "lucide-react";
 
@@ -15,8 +16,16 @@ import {
   type QualityLogEntry,
 } from "@/lib/api";
 
-type LayerFilter = "ALL" | "L1" | "L2" | "L3" | "L4";
+type LayerFilter = "ALL" | "L1" | "L2" | "L3" | "L4" | "NOTHING_TO_EXTRACT";
 type DateRangeFilter = "24h" | "7d" | "30d";
+
+function isNothingToExtract(row: QualityLogEntry): boolean {
+  return (
+    row.nothing_to_extract === true ||
+    (row.layer_blocked_at === "NONE" &&
+      /nothing[\s_-]*to[\s_-]*extract/i.test(row.reason ?? ""))
+  );
+}
 
 function applyDateRange(rows: QualityLogEntry[], range: DateRangeFilter): QualityLogEntry[] {
   const now = Date.now();
@@ -31,7 +40,12 @@ function applyDateRange(rows: QualityLogEntry[], range: DateRangeFilter): Qualit
 
 export default function QualityLogPage() {
   const { isLoaded, getToken } = useAuth();
-  const [layerFilter, setLayerFilter] = useState<LayerFilter>("ALL");
+  const searchParams = useSearchParams();
+  const [layerFilter, setLayerFilter] = useState<LayerFilter>(() =>
+    searchParams.get("status") === "nothing_to_extract"
+      ? "NOTHING_TO_EXTRACT"
+      : "ALL",
+  );
   const [dateRange, setDateRange] = useState<DateRangeFilter>("7d");
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -45,6 +59,9 @@ export default function QualityLogPage() {
     const rows = applyDateRange(qualityLog.data ?? [], dateRange);
     if (layerFilter === "ALL") {
       return rows;
+    }
+    if (layerFilter === "NOTHING_TO_EXTRACT") {
+      return rows.filter(isNothingToExtract);
     }
     return rows.filter((row) => row.layer_blocked_at === layerFilter);
   }, [dateRange, layerFilter, qualityLog.data]);
@@ -60,7 +77,11 @@ export default function QualityLogPage() {
         date.getUTCDate() === today.getUTCDate()
       );
     });
+    const nothingRows = todayRows.filter(isNothingToExtract);
     const blockedRows = todayRows.filter((row) => row.layer_blocked_at !== "NONE");
+    const storedRows = todayRows.filter(
+      (row) => row.layer_blocked_at === "NONE" && !isNothingToExtract(row),
+    );
     const byLayer = {
       L1: blockedRows.filter((row) => row.layer_blocked_at === "L1").length,
       L2: blockedRows.filter((row) => row.layer_blocked_at === "L2").length,
@@ -81,18 +102,22 @@ export default function QualityLogPage() {
     return {
       todayTotal: todayRows.length,
       todayBlocked: blockedRows.length,
+      todayNothingToExtract: nothingRows.length,
+      todayStored: storedRows.length,
       todayRate: todayRows.length ? blockedRows.length / todayRows.length : 0,
       byLayer,
       l2BlockRate,
       avgQuality,
       topLayer:
-        ["L1", "L2", "L3", "L4"].sort(
-          (left, right) =>
-            filteredRows.filter((row) => row.layer_blocked_at === right).length -
-            filteredRows.filter((row) => row.layer_blocked_at === left).length,
-        )[0] ?? "L1",
+        layerFilter === "NOTHING_TO_EXTRACT"
+          ? "NONE"
+          : ["L1", "L2", "L3", "L4"].sort(
+              (left, right) =>
+                filteredRows.filter((row) => row.layer_blocked_at === right).length -
+                filteredRows.filter((row) => row.layer_blocked_at === left).length,
+            )[0] ?? "L1",
     };
-  }, [filteredRows, qualityLog.data]);
+  }, [filteredRows, layerFilter, qualityLog.data]);
 
   const errorMessage = (qualityLog.error as ApiRequestError | undefined)?.message;
 
@@ -152,7 +177,7 @@ export default function QualityLogPage() {
       <Card>
         <CardContent className="pt-6">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            Today: {summary.todayBlocked} blocked (L1:{summary.byLayer.L1} L2:{summary.byLayer.L2} L3:{summary.byLayer.L3} L4:{summary.byLayer.L4}) out of {summary.todayTotal} total - {(summary.todayRate * 100).toFixed(1)}% block rate
+            Today: {summary.todayBlocked} blocked, {summary.todayNothingToExtract} nothing-to-extract, {summary.todayStored} stored - out of {summary.todayTotal} total
           </div>
 
           {!bannerDismissed && summary.l2BlockRate > 0.3 ? (
