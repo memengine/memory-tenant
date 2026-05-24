@@ -1,8 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Copy, Loader2, Send, Sparkles } from "lucide-react";
+import {
+  CheckCircle,
+  Copy,
+  Info,
+  Loader2,
+  MessageCircle,
+  Send,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
 
 import { JobTracker } from "@/components/job-tracker";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +50,7 @@ type RetrieveResponse = {
   data?: MemorySearchResult[];
   system_prompt_addition?: string;
   context_token_count?: number;
+  clarification_question?: string | null;
   cached?: boolean;
 };
 
@@ -49,6 +59,7 @@ type AddResponse = {
   status?: string;
   blocked_reason?: string | null;
   budget_remaining_pct?: number | null;
+  nothing_to_extract?: boolean;
 };
 
 const TIME_RANGE_OPTIONS: Array<{ label: string; value: TimeRangeValue }> = [
@@ -82,6 +93,64 @@ function unwrapRetrieve(payload: RetrieveResponse | { data?: RetrieveResponse })
 
 const primaryButtonClassName =
   "bg-sky-700 text-white shadow-sm hover:bg-sky-800 disabled:bg-slate-300 disabled:text-slate-500";
+const CONTEXT_MAX_TOKENS = 500;
+
+function AddResultExplainer({ result }: { result: AddResponse | null }) {
+  if (!result) {
+    return null;
+  }
+
+  const wasStored = result.status === "queued" && !result.nothing_to_extract;
+  const blocked = result.status === "blocked";
+
+  return (
+    <Card className="border-slate-200 bg-white shadow-sm">
+      <CardContent className="space-y-3 pt-5">
+        {wasStored ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <CheckCircle className="size-4" />
+              Memory will be stored
+            </div>
+            <p className="mt-1 text-emerald-800/80">
+              The request queued successfully. Track the job below until
+              extraction completes.
+            </p>
+          </div>
+        ) : null}
+
+        {result.nothing_to_extract ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <div className="flex items-center gap-2 font-semibold">
+              <Info className="size-4" />
+              Nothing to extract
+            </div>
+            <p className="mt-1 text-amber-900/80">
+              This conversation had no storable facts. Try a more informative
+              message.
+            </p>
+          </div>
+        ) : null}
+
+        {blocked ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <XCircle className="size-4" />
+              Blocked by quality gate
+            </div>
+            <p className="mt-1 text-rose-800/80">
+              {result.blocked_reason ?? "No blocked reason was returned."}
+            </p>
+          </div>
+        ) : null}
+
+        <pre className="max-h-52 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">
+          {JSON.stringify(result, null, 2)}
+        </pre>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function PlaygroundPage() {
   const { isLoaded, getToken } = useAuth();
@@ -100,6 +169,8 @@ export default function PlaygroundPage() {
   const [submittingRetrieve, setSubmittingRetrieve] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copyLabel, setCopyLabel] = useState("Copy");
+  const [questionCopyLabel, setQuestionCopyLabel] = useState("Copy question");
+  const retrieveRefreshTimer = useRef<number | null>(null);
 
   const promptAddition = useMemo(
     () =>
@@ -159,17 +230,31 @@ export default function PlaygroundPage() {
     }
   }
 
-  async function handleRetrieve() {
+  function handleExternalUserIdChange(value: string) {
+    setExternalUserId(value);
+    if (!retrieveResult || !value || !query || !isLoaded) {
+      return;
+    }
+
+    if (retrieveRefreshTimer.current) {
+      window.clearTimeout(retrieveRefreshTimer.current);
+    }
+    retrieveRefreshTimer.current = window.setTimeout(() => {
+      void handleRetrieve(value);
+    }, 350);
+  }
+
+  async function handleRetrieve(userId = externalUserId) {
     setSubmittingRetrieve(true);
     setError(null);
     try {
       const result = unwrapRetrieve(
         await apiRequest<RetrieveResponse>("/v1/memories/retrieve", {
-          external_user_id: externalUserId,
+          external_user_id: userId,
           query,
           limit: 5,
           format,
-          context_max_tokens: 500,
+          context_max_tokens: CONTEXT_MAX_TOKENS,
           ...(timeRange !== "all"
             ? { time_filter_days: Number(timeRange) }
             : {}),
@@ -189,6 +274,16 @@ export default function PlaygroundPage() {
     await navigator.clipboard.writeText(promptAddition);
     setCopyLabel("Copied");
     window.setTimeout(() => setCopyLabel("Copy"), 1400);
+  }
+
+  async function copyClarificationQuestion() {
+    const question = retrieveResult?.clarification_question;
+    if (!question) {
+      return;
+    }
+    await navigator.clipboard.writeText(question);
+    setQuestionCopyLabel("Copied");
+    window.setTimeout(() => setQuestionCopyLabel("Copy question"), 1400);
   }
 
   return (
@@ -236,7 +331,9 @@ export default function PlaygroundPage() {
                 </label>
                 <Input
                   value={externalUserId}
-                  onChange={(event) => setExternalUserId(event.target.value)}
+                  onChange={(event) =>
+                    handleExternalUserIdChange(event.target.value)
+                  }
                   placeholder="user_123"
                 />
               </div>
@@ -266,6 +363,7 @@ export default function PlaygroundPage() {
           </Card>
 
           <JobTracker jobId={addResult?.job_id ?? null} getToken={getToken} />
+          <AddResultExplainer result={addResult} />
         </div>
 
         <Card className="overflow-hidden border-sky-100 shadow-sm">
@@ -281,6 +379,19 @@ export default function PlaygroundPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-900">
+                External user ID
+              </label>
+              <Input
+                value={externalUserId}
+                onChange={(event) =>
+                  handleExternalUserIdChange(event.target.value)
+                }
+                placeholder="user_123"
+              />
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">
@@ -398,15 +509,59 @@ export default function PlaygroundPage() {
                 </Button>
               </div>
               {promptAddition ? (
-                <pre className="max-h-80 overflow-auto rounded-2xl bg-slate-950 p-4 text-sm leading-6 text-slate-100 shadow-inner">
-                  {promptAddition}
-                </pre>
+                <>
+                  <pre className="max-h-80 overflow-auto rounded-2xl bg-slate-950 p-4 text-sm leading-6 text-slate-100 shadow-inner">
+                    {promptAddition}
+                  </pre>
+                  <p className="text-xs text-slate-500">
+                    {retrieveResult?.context_token_count ?? 0} /{" "}
+                    {CONTEXT_MAX_TOKENS} tokens used
+                  </p>
+                </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-5 text-sm text-slate-500">
                   No memories retrieved - system prompt addition is empty
                 </div>
               )}
             </section>
+
+            {retrieveResult?.clarification_question ? (
+              <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex gap-3">
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                      <MessageCircle className="size-5" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">
+                        Suggested clarification for this user:
+                      </div>
+                      <p className="text-base font-medium italic leading-7">
+                        {retrieveResult.clarification_question}
+                      </p>
+                      <p className="text-sm text-amber-900/75">
+                        Include this naturally in your AI&apos;s next response
+                        to resolve a memory conflict for this user.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-amber-200 bg-white"
+                    onClick={() => void copyClarificationQuestion()}
+                  >
+                    <Copy className="mr-2 size-4" />
+                    {questionCopyLabel}
+                  </Button>
+                </div>
+                <p className="border-t border-amber-200 pt-3 text-xs text-amber-900/70">
+                  This question will disappear after the user&apos;s next
+                  session - MemoryOS tracks whether it was addressed.
+                </p>
+              </section>
+            ) : null}
           </CardContent>
         </Card>
       </div>
