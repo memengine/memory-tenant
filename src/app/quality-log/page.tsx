@@ -11,7 +11,7 @@ import { QualityLogTable } from "@/components/quality-log-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  ApiRequestError,
+  displayApiError,
   getAllTenantQualityLogEntries,
   type QualityLogEntry,
 } from "@/lib/api";
@@ -119,7 +119,7 @@ export default function QualityLogPage() {
     };
   }, [filteredRows, layerFilter, qualityLog.data]);
 
-  const errorMessage = (qualityLog.error as ApiRequestError | undefined)?.message;
+  const errorMessage = displayApiError(qualityLog.error);
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
