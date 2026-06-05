@@ -12,6 +12,20 @@ export class ApiRequestError extends Error {
   }
 }
 
+export function displayApiError(error: unknown): string | undefined {
+  if (!error) {
+    return undefined;
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "tenant_auth_required") {
+    return "Select or create a workspace to load tenant data.";
+  }
+  if (message === "tenant_not_found") {
+    return "Workspace data is still being created. Refresh once, then try again.";
+  }
+  return message;
+}
+
 export type QuotaMode =
   | "FULL"
   | "PASSTHROUGH"
@@ -155,7 +169,16 @@ export type TenantSettings = {
   overage_policy: "block" | "warn" | "charge";
 };
 
-export type DomainSchemaValue = "edtech" | null;
+export type DomainSchemaValue = "edtech" | "support" | null;
+export type SupportTypeValue =
+  | "saas"
+  | "ecommerce"
+  | "banking_fintech"
+  | "travel"
+  | "telecom"
+  | "edtech_support"
+  | "general_info";
+export type SupportTypeMode = "single" | "multi" | "auto";
 
 export type AvailableDomain = {
   value: string | null;
@@ -167,6 +190,9 @@ export type AvailableDomain = {
 export type TenantDomainSchema = {
   domain_schema: DomainSchemaValue;
   available_domains: AvailableDomain[];
+  support_type_configured: SupportTypeValue | null;
+  support_type_mode: SupportTypeMode;
+  support_types_allowed: SupportTypeValue[];
 };
 
 export type TenantStudentSummary = {
@@ -229,6 +255,33 @@ export type ApiKeyData = {
 
 export type ApiKeyCreateData = ApiKeyData & {
   raw_key: string;
+};
+
+export type MemoryCategory =
+  | "preference"
+  | "fact"
+  | "goal"
+  | "procedure"
+  | "relationship"
+  | "expertise";
+
+export type GlobalAgentData = {
+  id: string;
+  owner_tenant_id: string;
+  name: string;
+  description: string | null;
+  logo_url: string | null;
+  website_url: string | null;
+  default_categories_requested: MemoryCategory[];
+  redirect_uri: string;
+  is_verified: boolean;
+  is_public: boolean;
+  created_at: string | null;
+  is_active: boolean;
+};
+
+export type GlobalAgentCreateData = GlobalAgentData & {
+  raw_agent_api_key: string;
 };
 
 export type PaginatedResponse<T> = {
@@ -388,6 +441,33 @@ export async function updateTenantDomainSchema(
     {
       method: "PATCH",
       body: JSON.stringify({ domain_schema: domainSchema }),
+    },
+  );
+  return response.data;
+}
+
+export async function updateTenantSupportType(
+  getToken: TokenGetter,
+  payload: {
+    support_type: SupportTypeValue | null;
+    support_type_mode: SupportTypeMode;
+    support_types_allowed: SupportTypeValue[];
+  },
+): Promise<{
+  support_type_configured: SupportTypeValue | null;
+  support_type_mode: SupportTypeMode;
+  support_types_allowed: SupportTypeValue[];
+}> {
+  const response = await apiFetch<Envelope<{
+    support_type_configured: SupportTypeValue | null;
+    support_type_mode: SupportTypeMode;
+    support_types_allowed: SupportTypeValue[];
+  }>>(
+    "/v1/tenant/support-type",
+    getToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     },
   );
   return response.data;
@@ -729,6 +809,46 @@ export async function revokeApiKey(
     { method: "DELETE" },
   );
   return response.data.deleted;
+}
+
+export async function listGlobalAgents(
+  getToken: TokenGetter,
+): Promise<GlobalAgentData[]> {
+  const response = await apiFetch<Envelope<GlobalAgentData[]>>(
+    "/v1/agents/global",
+    getToken,
+  );
+  return response.data;
+}
+
+export async function createGlobalAgent(
+  getToken: TokenGetter,
+  payload: {
+    name: string;
+    description?: string | null;
+    logo_url?: string | null;
+    website_url?: string | null;
+    default_categories_requested: MemoryCategory[];
+    redirect_uri?: string | null;
+  },
+): Promise<GlobalAgentCreateData> {
+  const response = await apiFetch<Envelope<GlobalAgentCreateData>>(
+    "/v1/agents/global",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description || null,
+        logo_url: payload.logo_url || null,
+        website_url: payload.website_url || null,
+        default_categories_requested: payload.default_categories_requested,
+        redirect_uri: payload.redirect_uri || "",
+      }),
+    },
+  );
+
+  return response.data;
 }
 
 export async function updateTenantSettings(

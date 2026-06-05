@@ -32,6 +32,9 @@ export function useDomainSchema() {
     ...swr,
     domainSchema: swr.data?.domain_schema ?? null,
     availableDomains: swr.data?.available_domains ?? [],
+    supportTypeConfigured: swr.data?.support_type_configured ?? null,
+    supportTypeMode: swr.data?.support_type_mode ?? "single",
+    supportTypesAllowed: swr.data?.support_types_allowed ?? [],
     setDomainSchema,
   };
 }
