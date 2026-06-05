@@ -28,8 +28,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  ApiRequestError,
   createApiKey,
+  displayApiError,
   listApiKeys,
   revokeApiKey,
   type ApiKeyData,
@@ -120,7 +120,7 @@ export default function ApiKeysPage() {
   );
 
   const rows = useMemo(() => apiKeys.data?.rows ?? [], [apiKeys.data?.rows]);
-  const errorMessage = (apiKeys.error as ApiRequestError | undefined)?.message;
+  const errorMessage = displayApiError(apiKeys.error);
 
   const metrics = useMemo(() => {
     return {
@@ -147,7 +147,7 @@ export default function ApiKeysPage() {
       setCreateOpen(false);
       setRevealOpen(true);
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : "Unable to create API key.");
+      setSaveMessage(displayApiError(error) ?? "Unable to create API key.");
     } finally {
       setBusyAction(null);
     }
@@ -165,7 +165,7 @@ export default function ApiKeysPage() {
       await apiKeys.mutate();
       setSaveMessage("API key revoked.");
     } catch (error) {
-      setSaveMessage(error instanceof Error ? error.message : "Unable to revoke API key.");
+      setSaveMessage(displayApiError(error) ?? "Unable to revoke API key.");
     } finally {
       setBusyAction(null);
     }
