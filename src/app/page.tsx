@@ -24,7 +24,6 @@ import {
 import { MemoryLineChart } from "@/components/charts/memory-line-chart";
 import { MetricCard } from "@/components/metric-card";
 import { QuotaBar } from "@/components/quota-bar";
-import { SdkQuickstart } from "@/components/sdk-quickstart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +44,7 @@ import {
 import {
   ApiRequestError,
   type QuotaMode,
+  displayApiError,
   getAllTenantUsers,
   getGateBreakdown,
   getMemoryAdditions,
@@ -128,6 +128,40 @@ function getStatusLabel(status: "queued" | "blocked" | "passthrough") {
     return "Blocked";
   }
   return "Queued";
+}
+
+function getDomainDisplay(domain: ReturnType<typeof useDomainSchema>) {
+  if (domain.domainSchema === "edtech") {
+    return {
+      label: "EdTech Schema",
+      detail: "Student memory overlay active",
+      className: "border-sky-200 bg-sky-50 text-sky-700",
+      action: "Change ->",
+      actionHref: "/settings#domain",
+    };
+  }
+  if (domain.domainSchema === "support") {
+    const modeLabel =
+      domain.supportTypeMode === "multi"
+        ? "Multi-vertical"
+        : domain.supportTypeMode === "auto"
+          ? "Auto-detect"
+          : "Single vertical";
+    return {
+      label: "Customer Support Schema",
+      detail: `${modeLabel} support routing active`,
+      className: "border-amber-200 bg-amber-50 text-amber-800",
+      action: "Configure ->",
+      actionHref: "/settings#domain",
+    };
+  }
+  return {
+    label: "General Engine",
+    detail: "Generic memory extraction active",
+    className: "border-slate-200 bg-slate-100 text-slate-700",
+    action: "Switch to domain ->",
+    actionHref: null,
+  };
 }
 
 function EngineMetricCard({
@@ -252,6 +286,7 @@ export default function OverviewPage() {
 
   const conflictStats = useConflictStats();
   const domain = useDomainSchema();
+  const domainDisplay = getDomainDisplay(domain);
 
   const recentActivity = useSWR(
     swrKeyReady && usage.data ? ["recent-activity", usage.data.mode] : null,
@@ -308,6 +343,15 @@ export default function OverviewPage() {
   const usageError = usage.error as ApiRequestError | undefined;
   const usersError = users.error as ApiRequestError | undefined;
   const conflictStatsError = conflictStats.error as ApiRequestError | undefined;
+  const usageErrorMessage = displayApiError(usageError);
+  const usersErrorMessage = displayApiError(usersError);
+  const conflictStatsErrorMessage = displayApiError(conflictStatsError);
+  const additionsError = additions.error as ApiRequestError | undefined;
+  const gateBreakdownError = gateBreakdown.error as ApiRequestError | undefined;
+  const recentActivityError = recentActivity.error as ApiRequestError | undefined;
+  const additionsErrorMessage = displayApiError(additionsError);
+  const gateBreakdownErrorMessage = displayApiError(gateBreakdownError);
+  const recentActivityErrorMessage = displayApiError(recentActivityError);
   const pendingTenantReview =
     conflictStats.data?.pending_tenant_review ??
     conflictStats.data?.requires_attention ??
@@ -374,22 +418,19 @@ export default function OverviewPage() {
               </h1>
               <Badge
                 variant="outline"
-                className={
-                  domain.domainSchema === "edtech"
-                    ? "border-sky-200 bg-sky-50 text-sky-700"
-                    : "border-slate-200 bg-slate-100 text-slate-700"
-                }
+                className={domainDisplay.className}
+                title={domainDisplay.detail}
               >
-                {domain.domainSchema === "edtech"
-                  ? "🎓 EdTech Schema"
-                  : "⚙️ General Engine"}
+                {domainDisplay.label}
+
+
               </Badge>
-              {domain.domainSchema === "edtech" ? (
+              {domainDisplay.actionHref ? (
                 <Link
-                  href="/settings#domain"
+                  href={domainDisplay.actionHref}
                   className="text-sm font-medium text-sky-700 hover:text-sky-900"
                 >
-                  Change -&gt;
+                  {domainDisplay.action}
                 </Link>
               ) : (
                 <button
@@ -397,7 +438,7 @@ export default function OverviewPage() {
                   className="text-sm font-medium text-sky-700 hover:text-sky-900"
                   onClick={() => setDomainSelectionOpen(true)}
                 >
-                  Switch to domain -&gt;
+                  {domainDisplay.action}
                 </button>
               )}
             </div>
@@ -437,8 +478,6 @@ export default function OverviewPage() {
         </Card>
       ) : null}
 
-      <SdkQuickstart emptyState={metrics.memoriesStored === 0} />
-
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           title="Memories Stored"
@@ -446,7 +485,7 @@ export default function OverviewPage() {
           description="Total memories indexed for this tenant"
           icon={Database}
           loading={users.isLoading && !users.data}
-          error={usersError?.message}
+          error={usersErrorMessage}
           onRetry={() => void users.mutate()}
         />
         <MetricCard
@@ -455,7 +494,7 @@ export default function OverviewPage() {
           description="Rolling monthly API budget consumption"
           icon={Activity}
           loading={usage.isLoading && !usage.data}
-          error={usageError?.message}
+          error={usageErrorMessage}
           onRetry={() => void usage.mutate()}
         />
         <MetricCard
@@ -464,7 +503,7 @@ export default function OverviewPage() {
           description="Users with memory activity in the last 30 days"
           icon={Users}
           loading={users.isLoading && !users.data}
-          error={usersError?.message}
+          error={usersErrorMessage}
           onRetry={() => void users.mutate()}
         />
         <MetricCard
@@ -477,8 +516,7 @@ export default function OverviewPage() {
             (gateBreakdown.isLoading && !gateBreakdown.data)
           }
           error={
-            (additions.error as ApiRequestError | undefined)?.message ??
-            (gateBreakdown.error as ApiRequestError | undefined)?.message
+            additionsErrorMessage ?? gateBreakdownErrorMessage
           }
           onRetry={() => {
             void additions.mutate();
@@ -492,7 +530,7 @@ export default function OverviewPage() {
             description="conflicts handled automatically this month"
             icon={Zap}
             loading={conflictStats.isLoading && !conflictStats.data}
-            error={conflictStatsError?.message}
+            error={conflictStatsErrorMessage}
             onRetry={() => void conflictStats.mutate()}
             tooltip="MemoryOS detects when users have conflicting information and resolves it automatically using recency and confidence signals."
             tone="green"
@@ -504,7 +542,7 @@ export default function OverviewPage() {
           description="this month - memory kept accurate"
           icon={GitMerge}
           loading={usage.isLoading && !usage.data}
-          error={usageError?.message}
+          error={usageErrorMessage}
           onRetry={() => void usage.mutate()}
           tooltip="When a new memory contradicts an existing one, MemoryOS resolves the conflict automatically."
           tone={metrics.conflictsResolvedMtd > 0 ? "purple" : "gray"}
@@ -515,7 +553,7 @@ export default function OverviewPage() {
           description="of add() calls produced memories"
           icon={CheckCircle}
           loading={usage.isLoading && !usage.data}
-          error={usageError?.message}
+          error={usageErrorMessage}
           onRetry={() => void usage.mutate()}
           tooltip="The percentage of queued add() calls that successfully extracted at least one memory."
           tone={
@@ -532,7 +570,7 @@ export default function OverviewPage() {
           description="conversations with no storable information"
           icon={Info}
           loading={usage.isLoading && !usage.data}
-          error={usageError?.message}
+          error={usageErrorMessage}
           onRetry={() => void usage.mutate()}
           tooltip="These conversations passed the quality gate but contained no facts worth storing, such as greetings, acknowledgements, or off-topic messages. This is normal and expected."
           tone="gray"
@@ -645,7 +683,7 @@ export default function OverviewPage() {
 
       <QuotaBar
         loading={usage.isLoading && !usage.data}
-        error={usageError?.message}
+        error={usageErrorMessage}
         percentUsed={metrics.quotaUsedPct}
         mode={usage.data?.mode ?? "FULL"}
         callsUsed={usage.data?.calls_used}
@@ -657,13 +695,13 @@ export default function OverviewPage() {
         <MemoryLineChart
           data={additions.data ?? []}
           loading={additions.isLoading && !additions.data}
-          error={(additions.error as ApiRequestError | undefined)?.message}
+          error={additionsErrorMessage}
           onRetry={() => void additions.mutate()}
         />
         <GateDonutChart
           data={gateBreakdown.data ?? []}
           loading={gateBreakdown.isLoading && !gateBreakdown.data}
-          error={(gateBreakdown.error as ApiRequestError | undefined)?.message}
+          error={gateBreakdownErrorMessage}
           onRetry={() => void gateBreakdown.mutate()}
         />
       </section>
@@ -674,7 +712,7 @@ export default function OverviewPage() {
         <ErrorCard
           title="Unable to load recent activity"
           description={
-            (recentActivity.error as ApiRequestError).message ??
+            recentActivityErrorMessage ??
             "The recent activity feed is temporarily unavailable."
           }
           onRetry={() => void recentActivity.mutate()}
