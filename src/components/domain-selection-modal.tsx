@@ -22,7 +22,7 @@ const comingSoonDomains = [
   { icon: "🌾", name: "AgriTech", description: "Crop, soil, and farm advisory memory" },
   { icon: "💼", name: "HR Tech", description: "Hiring and workforce context" },
   { icon: "🎧", name: "Support", description: "Customer support memory" },
-];
+].filter((domain) => domain.name !== "Support");
 
 function markCompleted() {
   window.localStorage.setItem(DOMAIN_SELECTION_STORAGE_KEY, "true");
@@ -42,7 +42,7 @@ function OptionCard({
   preview,
   title,
 }: {
-  accent: "gray" | "blue";
+  accent: "gray" | "blue" | "amber";
   badge: string;
   bestFor: string;
   borderLabel?: string;
@@ -61,7 +61,9 @@ function OptionCard({
         "relative overflow-hidden border-2 bg-white shadow-sm transition-all",
         accent === "blue"
           ? "border-sky-300 shadow-sky-100"
-          : "border-slate-200",
+          : accent === "amber"
+            ? "border-amber-300 shadow-amber-100"
+            : "border-slate-200",
       )}
     >
       {borderLabel ? (
@@ -74,7 +76,7 @@ function OptionCard({
           <div
             className={cn(
               "flex size-12 items-center justify-center rounded-2xl text-2xl",
-              accent === "blue" ? "bg-sky-100" : "bg-slate-100",
+              accent === "blue" ? "bg-sky-100" : accent === "amber" ? "bg-amber-100" : "bg-slate-100",
             )}
             aria-hidden
           >
@@ -87,7 +89,9 @@ function OptionCard({
                 "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
                 accent === "blue"
                   ? "bg-sky-100 text-sky-700"
-                  : "bg-slate-100 text-slate-700",
+                  : accent === "amber"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-slate-100 text-slate-700",
               )}
             >
               {badge}
@@ -107,7 +111,11 @@ function OptionCard({
         <div
           className={cn(
             "space-y-2 rounded-2xl p-4 text-sm",
-            accent === "blue" ? "bg-sky-50 text-sky-900" : "bg-slate-50 text-slate-700",
+            accent === "blue"
+              ? "bg-sky-50 text-sky-900"
+              : accent === "amber"
+                ? "bg-amber-50 text-amber-950"
+                : "bg-slate-50 text-slate-700",
           )}
         >
           {preview.map((item) => (
@@ -120,7 +128,7 @@ function OptionCard({
 
         <Button
           className="w-full"
-          variant={accent === "blue" ? "default" : "outline"}
+          variant={accent === "gray" ? "outline" : "default"}
           onClick={onClick}
           disabled={disabled || loading}
         >
@@ -139,7 +147,7 @@ export function DomainSelectionModal({
   onSelected,
 }: DomainSelectionModalProps) {
   const { setDomainSchema } = useDomainSchema();
-  const [loading, setLoading] = useState<"general" | "edtech" | null>(null);
+  const [loading, setLoading] = useState<"general" | "edtech" | "support" | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error" | "info"; message: string } | null>(null);
 
   if (!open) {
@@ -177,6 +185,22 @@ export function DomainSelectionModal({
       setNotice({
         tone: "error",
         message: error instanceof Error ? error.message : "Unable to enable EdTech Schema.",
+      });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function chooseSupport() {
+    setLoading("support");
+    setNotice(null);
+    try {
+      await setDomainSchema("support");
+      closeAfterSelection("Customer Support Schema enabled. Customer memory will be structured automatically.");
+    } catch (error) {
+      setNotice({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Unable to enable Customer Support Schema.",
       });
     } finally {
       setLoading(null);
@@ -227,7 +251,7 @@ export function DomainSelectionModal({
           </div>
         ) : null}
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-2">
+        <section className="mt-8 grid gap-5 lg:grid-cols-3">
           <OptionCard
             accent="gray"
             icon="⚙️"
@@ -262,6 +286,23 @@ export function DomainSelectionModal({
             loading={loading === "edtech"}
             disabled={loading !== null}
             onClick={() => void chooseEdTech()}
+          />
+          <OptionCard
+            accent="amber"
+            icon="CS"
+            title="Customer Support Schema"
+            badge="Structured customer memory"
+            description="Tracks account context, open issues, support history, resolution preferences, and support-type-specific signals."
+            bestFor="Support chatbots, help desks, CRM AI, customer service automation"
+            preview={[
+              "Order ORD-44821 delayed - resolved via reship",
+              "Prefers direct communication",
+              "High value customer since 2023",
+            ]}
+            cta="Use Support Schema"
+            loading={loading === "support"}
+            disabled={loading !== null}
+            onClick={() => void chooseSupport()}
           />
         </section>
 
