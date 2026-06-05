@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import {
   ApiRequestError,
+  displayApiError,
   type MemoryRecord,
   type PaginatedResponse,
   type TokenGetter,
@@ -246,6 +247,7 @@ export default function MemoriesPage() {
       topCategory,
     };
   }, [memories.data]);
+  const errorMessage = displayApiError(memories.error);
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
@@ -269,7 +271,7 @@ export default function MemoriesPage() {
           description="Latest records returned from the memories API"
           icon={Brain}
           loading={memories.isLoading && !memories.data}
-          error={(memories.error as ApiRequestError | undefined)?.message}
+          error={errorMessage}
           onRetry={() => void memories.mutate()}
         />
         <MetricCard
@@ -278,7 +280,7 @@ export default function MemoriesPage() {
           description="Records marked as archived in the current view"
           icon={Archive}
           loading={memories.isLoading && !memories.data}
-          error={(memories.error as ApiRequestError | undefined)?.message}
+          error={errorMessage}
           onRetry={() => void memories.mutate()}
         />
         <MetricCard
@@ -287,7 +289,7 @@ export default function MemoriesPage() {
           description="Mean importance score across loaded memories"
           icon={Star}
           loading={memories.isLoading && !memories.data}
-          error={(memories.error as ApiRequestError | undefined)?.message}
+          error={errorMessage}
           onRetry={() => void memories.mutate()}
         />
         <MetricCard
@@ -296,7 +298,7 @@ export default function MemoriesPage() {
           description="Most common memory category in the current page"
           icon={FolderOpen}
           loading={memories.isLoading && !memories.data}
-          error={(memories.error as ApiRequestError | undefined)?.message}
+          error={errorMessage}
           onRetry={() => void memories.mutate()}
         />
       </section>
@@ -354,7 +356,7 @@ export default function MemoriesPage() {
           ) : memories.error ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
               <div className="text-sm font-medium text-rose-800">
-                {(memories.error as ApiRequestError).message}
+                {errorMessage}
               </div>
               <Button className="mt-3" variant="outline" onClick={() => void memories.mutate()}>
                 Retry
