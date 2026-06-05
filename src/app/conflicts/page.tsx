@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  ApiRequestError,
+  displayApiError,
   type SharedContextConflict,
   getSharedContextConflicts,
   resolveTenantConflict,
@@ -218,9 +218,7 @@ export default function ConflictsPage() {
   }
 
   const loading = (stats.isLoading && !stats.data) || (conflicts.isLoading && !conflicts.data);
-  const error =
-    (stats.error as ApiRequestError | undefined) ??
-    (conflicts.error as ApiRequestError | undefined);
+  const errorMessage = displayApiError(stats.error) ?? displayApiError(conflicts.error);
 
   const resolvedForTab = resolvedConflicts.filter((conflict) => {
     if (resolvedTab === "user") {
@@ -255,10 +253,10 @@ export default function ConflictsPage() {
             Loading conflict intelligence...
           </CardContent>
         </Card>
-      ) : error ? (
+      ) : errorMessage ? (
         <Card className="border-rose-200 bg-rose-50">
           <CardContent className="py-6 text-sm text-rose-900">
-            {error.message}
+            {errorMessage}
           </CardContent>
         </Card>
       ) : stats.data ? (
