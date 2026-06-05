@@ -9,8 +9,8 @@ import { MetricCard } from "@/components/metric-card";
 import { UserTable } from "@/components/user-table";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  ApiRequestError,
   blockTenantUser,
+  displayApiError,
   getTenantUsersPage,
   type TenantUser,
   truncateUserId,
@@ -162,7 +162,7 @@ export default function UsersPage() {
     downloadCsv(csv, "memoryos-tenant-users.csv");
   }
 
-  const errorMessage = (users.error as ApiRequestError | undefined)?.message;
+  const errorMessage = displayApiError(users.error);
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
