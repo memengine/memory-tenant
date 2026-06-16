@@ -11,6 +11,16 @@ function truncateUserId(value?: string | null) {
   return value ? `${value.slice(0, 8)}***` : "unknown";
 }
 
+function sourceLabel(value?: string | null) {
+  if (!value) {
+    return "Unregistered source";
+  }
+  return value
+    .split(/[-_]/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function entityLabel(value: string) {
   return value
     .split("_")
@@ -56,6 +66,10 @@ export function ConflictTenantReviewCard({
 }) {
   const userA = truncateUserId(conflict.user_a_id);
   const userB = truncateUserId(conflict.user_b_id);
+  const sameUser =
+    Boolean(conflict.user_a_id) && conflict.user_a_id === conflict.user_b_id;
+  const sourceA = sourceLabel(conflict.source_service_a);
+  const sourceB = sourceLabel(conflict.source_service_b);
   const memoryA = conflict.memory_a_content ?? "Memory content unavailable.";
   const memoryB = conflict.memory_b_content ?? "Memory content unavailable.";
 
@@ -81,7 +95,7 @@ export function ConflictTenantReviewCard({
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm font-semibold text-slate-950">
-              User {userA} told your AI:
+              {sameUser ? `${sourceA} reported:` : `User ${userA} told your AI:`}
             </p>
             <blockquote className="mt-3 text-sm leading-6 text-slate-700">
               &ldquo;{memoryA}&rdquo;
@@ -92,7 +106,7 @@ export function ConflictTenantReviewCard({
           </div>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-slate-950">
-              User {userB} told your AI:
+              {sameUser ? `${sourceB} reported:` : `User ${userB} told your AI:`}
             </p>
             <blockquote className="mt-3 text-sm leading-6 text-slate-800">
               &ldquo;{memoryB}&rdquo;
@@ -104,7 +118,9 @@ export function ConflictTenantReviewCard({
         </div>
 
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-medium text-sky-950">
-          Which reflects your organisation&apos;s current reality?
+          {sameUser
+            ? "Two equally trusted services disagree. Which claim should MemoryOS use?"
+            : "Which reflects your organisation's current reality?"}
         </div>
 
         <div className="grid gap-3 lg:grid-cols-3">
@@ -119,7 +135,7 @@ export function ConflictTenantReviewCard({
               }
             }}
           >
-            {userA}&apos;s version is current
+            {sameUser ? `${sourceA} is correct` : `${userA}'s version is current`}
           </Button>
           <Button
             type="button"
@@ -132,7 +148,7 @@ export function ConflictTenantReviewCard({
               }
             }}
           >
-            {userB}&apos;s version is current
+            {sameUser ? `${sourceB} is correct` : `${userB}'s version is current`}
           </Button>
           <Button
             type="button"
