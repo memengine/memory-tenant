@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import {
+  ArrowRight,
   CheckCircle2,
   Copy,
   ExternalLink,
   Fingerprint,
+  Info,
   Link2,
   Plus,
   ShieldAlert,
@@ -20,10 +22,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import {
   createGlobalAgent,
+  createPassportLinkToken,
   displayApiError,
   listGlobalAgents,
   type GlobalAgentData,
   type MemoryCategory,
+  type PassportLinkTokenData,
 } from "@/lib/api";
 
 const ALL_CATEGORIES: Array<{ value: MemoryCategory; label: string; description: string }> = [
@@ -101,6 +105,17 @@ function buildConsentUrl(options: {
   return `${CONSENT_BASE}/consent?${params.toString()}`;
 }
 
+function buildConnectUrl(options: { agentId: string; linkToken: string }) {
+  if (!CONSENT_BASE) {
+    return "";
+  }
+  const params = new URLSearchParams({
+    agent_id: options.agentId,
+    link_token: options.linkToken,
+  });
+  return `${CONSENT_BASE}/connect?${params.toString()}`;
+}
+
 function CategoryPicker({
   selected,
   onChange,
@@ -170,6 +185,26 @@ function AgentStatusBadge({ agent }: { agent: GlobalAgentData }) {
   );
 }
 
+function PassportStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+        {step}
+      </div>
+      <div className="mt-2 font-semibold text-slate-950">{title}</div>
+      <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
+    </div>
+  );
+}
+
 export default function MemoryPassportPage() {
   const { isLoaded, getToken } = useAuth();
   const [name, setName] = useState("");
@@ -188,9 +223,14 @@ export default function MemoryPassportPage() {
   ]);
   const [stateValue, setStateValue] = useState("user_session_id");
   const [redirectUri, setRedirectUri] = useState("");
+  const [externalUserId, setExternalUserId] = useState("");
+  const [linkTokenData, setLinkTokenData] = useState<PassportLinkTokenData | null>(null);
   const [rawAgentKey, setRawAgentKey] = useState<string | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkMessage, setLinkMessage] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const agentsQuery = useSWR(
@@ -213,6 +253,10 @@ export default function MemoryPassportPage() {
         redirectUri,
       })
     : "";
+  const connectUrl =
+    selectedAgent && linkTokenData
+      ? buildConnectUrl({ agentId: selectedAgent.id, linkToken: linkTokenData.link_token })
+      : "";
 
   async function handleCreateAgent() {
     if (!name.trim()) {
@@ -238,12 +282,40 @@ export default function MemoryPassportPage() {
       setSelectedAgentId(created.id);
       setRawAgentKey(created.raw_agent_api_key);
       setRevealOpen(true);
-      setMessage("Global agent created. It is now visible to MemoryOS operators for verification review.");
+      setMessage("Passport agent created. MemoryOS operators can now review it for the verification badge.");
       await agentsQuery.mutate();
     } catch (error) {
-      setMessage(displayApiError(error) ?? "Unable to create global agent.");
+      setMessage(displayApiError(error) ?? "Unable to create Passport agent.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleCreateLinkToken() {
+    setLinkMessage(null);
+    setLinkError(null);
+    if (!selectedAgent) {
+      setLinkError("Create or select a Passport agent first.");
+      return;
+    }
+    if (!externalUserId.trim()) {
+      setLinkError("Enter the user ID from your app before creating a connector link.");
+      return;
+    }
+    setLinkBusy(true);
+    setMessage(null);
+    setLinkTokenData(null);
+    try {
+      const issued = await createPassportLinkToken(getToken, {
+        agent_id: selectedAgent.id,
+        external_user_id: externalUserId.trim(),
+      });
+      setLinkTokenData(issued);
+      setLinkMessage("Connector link created. Open it immediately; it is single-use and expires automatically.");
+    } catch (error) {
+      setLinkError(displayApiError(error) ?? "Unable to create connector link.");
+    } finally {
+      setLinkBusy(false);
     }
   }
 
@@ -254,12 +326,65 @@ export default function MemoryPassportPage() {
           Memory Passport
         </span>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-          Global agents and consent URLs
+          User-approved memory for your AI agents
         </h1>
         <p className="max-w-3xl text-sm text-slate-600 sm:text-base">
-          Register cross-agent identities, copy the agent ID, and generate consent links for users who want to share approved memory with your agents.
+          Create a public agent identity, share a permission link, and let users choose which
+          Memory Passport categories your agent can read. Nothing is shared until the user
+          approves it on the consent screen.
         </p>
       </div>
+
+      <section className="grid gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
+        <PassportStep
+          step="Step 1"
+          title="Create an agent identity"
+          description="This is the public profile users see before approving access. The secret key stays in your backend."
+        />
+        <div className="hidden items-center text-slate-300 lg:flex">
+          <ArrowRight className="size-5" />
+        </div>
+        <PassportStep
+          step="Step 2"
+          title="Share a consent link"
+          description="Use the generated URL behind a button like Connect shared memory in your product."
+        />
+        <div className="hidden items-center text-slate-300 lg:flex">
+          <ArrowRight className="size-5" />
+        </div>
+        <PassportStep
+          step="Step 3"
+          title="User stays in control"
+          description="The user can edit categories, choose an expiry, revoke access, and resolve personal memory conflicts."
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="border-sky-100 bg-sky-50/60">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Link2 className="size-4 text-sky-700" />
+              Consent URL
+            </CardTitle>
+            <CardDescription>
+              Use this when your AI agent wants permission to read a user's Memory Passport.
+              Add it to a user-facing button such as Connect shared memory.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+        <Card className="border-emerald-100 bg-emerald-50/60">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Fingerprint className="size-4 text-emerald-700" />
+              Secure-link connector
+            </CardTitle>
+            <CardDescription>
+              Use this fallback when your app does not have OAuth/OIDC yet. After a signed-in
+              user clicks Connect Memory Passport, your backend creates a one-time link.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </section>
 
       {message ? (
         <Card className="border border-slate-200 bg-slate-50">
@@ -272,9 +397,9 @@ export default function MemoryPassportPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Fingerprint className="size-5 text-sky-700" />
-              Agents
+              Agent identities
             </CardTitle>
-            <CardDescription>Public identities that can request Memory Passport access.</CardDescription>
+            <CardDescription>Profiles users see on the Memory Passport consent page.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold text-slate-950">{agents.length}</div>
@@ -286,7 +411,7 @@ export default function MemoryPassportPage() {
               <CheckCircle2 className="size-5 text-emerald-700" />
               Verified
             </CardTitle>
-            <CardDescription>Agents trusted by MemoryOS on the consent page.</CardDescription>
+            <CardDescription>Reviewed identities that show a MemoryOS verification badge.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold text-slate-950">
@@ -300,7 +425,7 @@ export default function MemoryPassportPage() {
               <ShieldAlert className="size-5 text-amber-700" />
               Needs review
             </CardTitle>
-            <CardDescription>New agents operators can verify from the operator console.</CardDescription>
+            <CardDescription>Created agents waiting for MemoryOS operator review.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold text-slate-950">
@@ -310,15 +435,16 @@ export default function MemoryPassportPage() {
         </Card>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)]">
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="size-5" />
-              Create global agent
+              Create Passport agent
             </CardTitle>
             <CardDescription>
-              The raw agent key is shown once after creation. Store it in your backend secret manager.
+              This creates the app identity shown to users during consent. The private key is
+              shown once and should be stored only in your backend secret manager.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -345,23 +471,25 @@ export default function MemoryPassportPage() {
               <div>
                 <div className="text-sm font-medium text-slate-800">Default requested categories</div>
                 <p className="text-sm text-slate-500">
-                  These are only defaults. Each consent URL can preselect a different set, and users make the final choice.
+                  Pick the categories your agent usually needs. These are defaults only - users
+                  can remove categories before approving access.
                 </p>
               </div>
               <CategoryPicker selected={defaultCategories} onChange={setDefaultCategories} />
             </div>
 
             <Button onClick={() => void handleCreateAgent()} disabled={busy || !name.trim()}>
-              {busy ? "Creating..." : "Create Global Agent"}
+              {busy ? "Creating..." : "Create agent identity"}
             </Button>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Consent URL builder</CardTitle>
+            <CardTitle>Share Memory Passport access</CardTitle>
             <CardDescription>
-              Build a link for a user-facing &quot;Connect shared memory&quot; button.
+              Generate the link your product opens when a user clicks &quot;Connect shared
+              memory&quot;. The link starts a permission flow; it does not grant access by itself.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -369,7 +497,8 @@ export default function MemoryPassportPage() {
               <>
                 {!CONSENT_BASE ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    Set <code>NEXT_PUBLIC_CONSENT_BASE_URL</code> for this dashboard environment before sharing consent links.
+                    Consent links are not configured for this dashboard environment yet. Set
+                    the consent app URL before sharing links with users.
                   </div>
                 ) : null}
 
@@ -411,13 +540,23 @@ export default function MemoryPassportPage() {
                         </Button>
                       ) : null}
                     </div>
+                    <div className="mt-3 flex gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
+                      <Info className="mt-0.5 size-4 shrink-0 text-sky-700" />
+                      <span>
+                        Agent ID is for your backend configuration. Users should receive the
+                        consent URL, not the private agent key.
+                      </span>
+                    </div>
                   </div>
                 ) : null}
 
                 <div className="space-y-3">
                   <div>
                     <div className="text-sm font-medium text-slate-800">Preselected categories</div>
-                    <p className="text-sm text-slate-500">Users can add or remove categories on the consent page.</p>
+                    <p className="text-sm text-slate-500">
+                      These categories are preselected for convenience. The user can change
+                      them before approving access.
+                    </p>
                   </div>
                   <CategoryPicker selected={urlCategories} onChange={setUrlCategories} />
                 </div>
@@ -425,14 +564,26 @@ export default function MemoryPassportPage() {
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-slate-700">State</span>
                   <Input value={stateValue} onChange={(event) => setStateValue(event.target.value)} placeholder="secure_random_state" />
+                  <span className="block text-xs leading-5 text-slate-500">
+                    Optional value returned to your app after consent. Use your own session or
+                    request ID so you can match the result.
+                  </span>
                 </label>
                 <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-700">Redirect URI optional</span>
+                  <span className="text-sm font-medium text-slate-700">Return URL optional</span>
                   <Input value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} placeholder="https://yourapp.com/integrations/memoryos/callback" />
+                  <span className="block text-xs leading-5 text-slate-500">
+                    Send the user back to your app after approval. If blank, MemoryOS shows a
+                    clear success screen.
+                  </span>
                 </label>
 
                 <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">
                   {consentUrl || "Consent URL is not configured for this environment."}
+                </div>
+                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
+                  Put this URL behind your product button. The user reviews your agent, chooses
+                  categories, and can revoke access later from their Memory Passport.
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => void copyText(consentUrl)} disabled={!consentUrl}>
@@ -448,6 +599,95 @@ export default function MemoryPassportPage() {
                     </Button>
                   ) : null}
                 </div>
+
+                <div className="border-t border-slate-200 pt-5">
+                  <div className="space-y-1">
+                    <h3 className="font-semibold text-slate-950">Secure-link connector</h3>
+                    <p className="text-sm leading-6 text-slate-600">
+                      This is the no-OAuth connector path. In your app, a signed-in customer
+                      clicks Connect Memory Passport, your backend creates a one-time link, and
+                      the user reviews access on MemoryOS.
+                    </p>
+                  </div>
+
+                  <div className="mt-4 space-y-4">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                      This dashboard generator is for manually checking one user flow. In
+                      production, your backend calls the same API automatically for the
+                      signed-in user and redirects them to the generated connector link.
+                    </div>
+
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-700">User ID in your app</span>
+                      <Input
+                        value={externalUserId}
+                        onChange={(event) => {
+                          setExternalUserId(event.target.value);
+                          setLinkTokenData(null);
+                          setLinkMessage(null);
+                          setLinkError(null);
+                        }}
+                        placeholder="cust_8a72 or user_123"
+                      />
+                      <span className="block text-xs leading-5 text-slate-500">
+                        For real users, pass this value from your authenticated app session
+                        when the user clicks Connect Memory Passport.
+                      </span>
+                    </label>
+
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleCreateLinkToken()}
+                      disabled={linkBusy || !selectedAgent || !externalUserId.trim()}
+                    >
+                      {linkBusy ? "Creating connector link..." : "Create connector link"}
+                    </Button>
+
+                    {linkError ? (
+                      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800">
+                        {linkError}
+                      </div>
+                    ) : null}
+
+                    {linkMessage ? (
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
+                        {linkMessage}
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+                      In production, generate this link server-side only after the user is
+                      signed in to your app. Tell the user: MemoryOS will open so you can approve
+                      the connector and choose what this AI can access. You can revoke it anytime.
+                    </div>
+
+                    {linkTokenData ? (
+                      <>
+                        <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">
+                          {connectUrl || "Connect URL is not configured for this environment."}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button onClick={() => void copyText(connectUrl)} disabled={!connectUrl}>
+                            <Copy className="mr-2 size-4" />
+                            Copy connector link
+                          </Button>
+                          {connectUrl ? (
+                            <Button variant="outline" asChild>
+                              <a href={connectUrl} target="_blank" rel="noreferrer">
+                                <Link2 className="mr-2 size-4" />
+                                Test link
+                              </a>
+                            </Button>
+                          ) : null}
+                        </div>
+                        <p className="text-xs leading-5 text-slate-500">
+                          Expires in {Math.round(linkTokenData.expires_in_seconds / 60)} minutes.
+                          Create a fresh link each time the user starts the connection flow.
+                        </p>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
               </>
             ) : agentsQuery.error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
@@ -460,7 +700,8 @@ export default function MemoryPassportPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Create a global agent first, then generate consent URLs here.
+                Create a Passport agent first. Then this panel will generate the consent URL
+                for your user-facing Connect shared memory button.
               </div>
             )}
           </CardContent>
@@ -469,9 +710,10 @@ export default function MemoryPassportPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Global agents</CardTitle>
+          <CardTitle>Passport agents</CardTitle>
           <CardDescription>
-            Agent secrets are not shown again after creation. Create a new agent if a secret is lost.
+            Public agent identities registered by this workspace. Private keys are shown only
+            once at creation time.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -508,7 +750,7 @@ export default function MemoryPassportPage() {
             </div>
           ) : (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-              No global agents yet.
+              No Passport agents yet.
             </div>
           )}
         </CardContent>
