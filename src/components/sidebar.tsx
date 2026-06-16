@@ -14,6 +14,7 @@ import {
   GraduationCap,
   KeyRound,
   LayoutDashboard,
+  Network,
   Menu,
   Sparkles,
   Settings,
@@ -41,6 +42,7 @@ const navItems = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/quality-log", label: "Quality Log", icon: ShieldAlert },
   { href: "/conflicts", label: "Conflicts", icon: GitMerge },
+  { href: "/sources", label: "Sources", icon: Network },
   { href: "/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
