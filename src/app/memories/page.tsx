@@ -7,6 +7,7 @@ import useSWR from "swr";
 import {
   Archive,
   Brain,
+  DatabaseZap,
   Flame,
   FolderOpen,
   History,
@@ -209,6 +210,16 @@ function MemoryStatusBadges({ memory }: { memory: MemoryExplorerRecord }) {
           title="Auto-archived by lifecycle manager due to low importance and inactivity"
         >
           AUTO
+        </Badge>
+      ) : null}
+      {memory.provenance?.service ? (
+        <Badge
+          variant="outline"
+          className="border-violet-200 bg-violet-50 text-violet-800"
+          title={`Observed by ${memory.provenance.service}${memory.provenance.event_id ? ` as ${memory.provenance.event_id}` : ""}`}
+        >
+          <DatabaseZap className="mr-1 size-3" />
+          {memory.provenance.service}
         </Badge>
       ) : null}
     </div>
