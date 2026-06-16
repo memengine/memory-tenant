@@ -93,6 +93,8 @@ export type SharedContextConflict = {
   user_b_memory_id?: string | null;
   memory_a_content: string | null;
   memory_b_content: string | null;
+  source_service_a?: string | null;
+  source_service_b?: string | null;
   memory_a_created_at?: string | null;
   memory_b_created_at?: string | null;
   resolved_at?: string | null;
@@ -257,6 +259,45 @@ export type ApiKeyCreateData = ApiKeyData & {
   raw_key: string;
 };
 
+export type AuthorityRules = {
+  default_priority: number;
+  categories: Record<string, number>;
+  domain_fields: Record<string, number>;
+};
+
+export type ServiceWriter = {
+  id: string;
+  service_key: string;
+  display_name: string;
+  api_key_id: string | null;
+  authority_rules: AuthorityRules;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EvidenceReference = {
+  source_type: string;
+  reference: string;
+  content_hash?: string | null;
+};
+
+export type MemorySourceEvent = {
+  id: string;
+  external_user_id: string;
+  writer_id: string | null;
+  api_key_id: string | null;
+  source_service: string;
+  source_event_id: string;
+  observed_at: string;
+  received_at: string;
+  payload_hash: string;
+  scope: Record<string, unknown>;
+  evidence_refs: EvidenceReference[];
+  processing_metadata: Record<string, unknown>;
+  extraction_job_id: string | null;
+};
+
 export type MemoryCategory =
   | "preference"
   | "fact"
@@ -284,6 +325,11 @@ export type GlobalAgentCreateData = GlobalAgentData & {
   raw_agent_api_key: string;
 };
 
+export type PassportLinkTokenData = {
+  link_token: string;
+  expires_in_seconds: number;
+};
+
 export type PaginatedResponse<T> = {
   data: T[];
   pagination: {
@@ -308,6 +354,17 @@ export type MemoryRecord = {
   is_archived: boolean;
   system_archived?: boolean;
   source_job_id?: string | null;
+  source_event_id?: string | null;
+  provenance?: {
+    event_id?: string;
+    service?: string;
+    observed_at?: string;
+    received_at?: string | null;
+    payload_hash?: string;
+    evidence?: EvidenceReference[];
+    authority_rules?: AuthorityRules;
+    processing?: Record<string, unknown>;
+  } | null;
   agent_id: string | null;
   metadata: Record<string, unknown>;
 };
@@ -762,8 +819,9 @@ export async function listApiKeys(
   getToken: TokenGetter,
   options?: { cursor?: string | null; limit?: number },
 ): Promise<PaginatedResponse<ApiKeyData>> {
+  const limit = Math.min(50, Math.max(1, options?.limit ?? 20));
   const search = new URLSearchParams({
-    limit: String(options?.limit ?? 20),
+    limit: String(limit),
   });
   if (options?.cursor) {
     search.set("cursor", options.cursor);
@@ -811,6 +869,81 @@ export async function revokeApiKey(
   return response.data.deleted;
 }
 
+export async function listServiceWriters(
+  getToken: TokenGetter,
+): Promise<ServiceWriter[]> {
+  const response = await apiFetch<Envelope<ServiceWriter[]>>(
+    "/v1/tenant/service-writers",
+    getToken,
+  );
+  return response.data;
+}
+
+export async function createServiceWriter(
+  getToken: TokenGetter,
+  payload: {
+    service_key: string;
+    display_name: string;
+    api_key_id?: string | null;
+    authority_rules: AuthorityRules;
+  },
+): Promise<ServiceWriter> {
+  const response = await apiFetch<Envelope<ServiceWriter>>(
+    "/v1/tenant/service-writers",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+  return response.data;
+}
+
+export async function updateServiceWriter(
+  getToken: TokenGetter,
+  writerId: string,
+  payload: Partial<{
+    display_name: string;
+    api_key_id: string | null;
+    authority_rules: AuthorityRules;
+    is_active: boolean;
+  }>,
+): Promise<ServiceWriter> {
+  const response = await apiFetch<Envelope<ServiceWriter>>(
+    `/v1/tenant/service-writers/${encodeURIComponent(writerId)}`,
+    getToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+  );
+  return response.data;
+}
+
+export async function listSourceEvents(
+  getToken: TokenGetter,
+  options?: {
+    externalUserId?: string;
+    sourceService?: string;
+    limit?: number;
+  },
+): Promise<MemorySourceEvent[]> {
+  const search = new URLSearchParams({
+    limit: String(options?.limit ?? 100),
+  });
+  if (options?.externalUserId) {
+    search.set("external_user_id", options.externalUserId);
+  }
+  if (options?.sourceService) {
+    search.set("source_service", options.sourceService);
+  }
+  const response = await apiFetch<Envelope<MemorySourceEvent[]>>(
+    `/v1/tenant/source-events?${search.toString()}`,
+    getToken,
+  );
+  return response.data;
+}
+
 export async function listGlobalAgents(
   getToken: TokenGetter,
 ): Promise<GlobalAgentData[]> {
@@ -845,6 +978,25 @@ export async function createGlobalAgent(
         default_categories_requested: payload.default_categories_requested,
         redirect_uri: payload.redirect_uri || "",
       }),
+    },
+  );
+
+  return response.data;
+}
+
+export async function createPassportLinkToken(
+  getToken: TokenGetter,
+  payload: {
+    agent_id: string;
+    external_user_id: string;
+  },
+): Promise<PassportLinkTokenData> {
+  const response = await apiFetch<Envelope<PassportLinkTokenData>>(
+    "/v1/tenant/memory-passport/link-token",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
     },
   );
 
