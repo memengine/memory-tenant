@@ -10,6 +10,8 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect()
   }
+}, {
+  clockSkewInMs: Number(process.env.CLERK_CLOCK_SKEW_MS || "10000"),
 })
 
 export const config = {

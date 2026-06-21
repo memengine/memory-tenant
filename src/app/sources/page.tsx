@@ -1,13 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import {
   Activity,
-  DatabaseZap,
   FileKey2,
   Filter,
+  GitCompareArrows,
   Network,
   Pencil,
   Plus,
@@ -49,11 +50,14 @@ import {
   createServiceWriter,
   displayApiError,
   listApiKeys,
+  listMemoryClaims,
   listServiceWriters,
   listSourceEvents,
   updateServiceWriter,
   type ApiKeyData,
   type AuthorityRules,
+  type EvidenceReference,
+  type MemoryClaim,
   type MemorySourceEvent,
   type ServiceWriter,
 } from "@/lib/api";
@@ -286,12 +290,16 @@ function WriterDialog({
 }
 
 function EvidenceList({ event }: { event: MemorySourceEvent }) {
-  if (event.evidence_refs.length === 0) {
+  return <EvidenceRefsList refs={event.evidence_refs} />;
+}
+
+function EvidenceRefsList({ refs }: { refs: EvidenceReference[] }) {
+  if (refs.length === 0) {
     return <span className="text-slate-400">No references</span>;
   }
   return (
     <div className="flex max-w-xs flex-wrap gap-1.5">
-      {event.evidence_refs.map((evidence, index) => (
+      {refs.map((evidence, index) => (
         <Badge
           key={`${evidence.source_type}-${evidence.reference}-${index}`}
           variant="outline"
@@ -301,6 +309,150 @@ function EvidenceList({ event }: { event: MemorySourceEvent }) {
           {evidence.source_type}: {evidence.reference}
         </Badge>
       ))}
+    </div>
+  );
+}
+
+function ClaimStatusBadge({ status }: { status: MemoryClaim["status"] }) {
+  const styles = {
+    active: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    disputed: "border-amber-200 bg-amber-50 text-amber-800",
+    superseded: "border-slate-200 bg-slate-100 text-slate-600",
+    archived: "border-slate-200 bg-slate-100 text-slate-600",
+  }[status];
+  return (
+    <Badge variant="outline" className={styles}>
+      {status}
+    </Badge>
+  );
+}
+
+function ClaimCard({ claim }: { claim: MemoryClaim }) {
+  const winningRevisionId = claim.winning_revision_id;
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <ClaimStatusBadge status={claim.status} />
+            <Badge variant="outline" className="capitalize">
+              {claim.category}
+            </Badge>
+            <span className="font-mono text-xs text-slate-400">
+              {shortHash(claim.claim_fingerprint)}
+            </span>
+          </div>
+          <h3 className="text-base font-semibold text-slate-950">
+            {claim.predicate_key}
+          </h3>
+          <div className="text-sm text-slate-600">
+            User <span className="font-mono text-slate-800">{claim.external_user_id}</span>
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Active value
+          </div>
+          <div className="mt-1 max-w-md break-words font-medium text-slate-950">
+            {claim.active_value ?? "No active value"}
+          </div>
+          {claim.status === "disputed" ? (
+            <Button asChild variant="outline" size="sm" className="mt-3 border-amber-300 bg-white">
+              <Link href="/conflicts">Resolve in Conflicts</Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 sm:grid-cols-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Authority
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-900">
+            {claim.authority_priority}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Confidence
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-900">
+            {claim.confidence_score.toFixed(2)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Observed
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-900">
+            {claim.observed_at ? formatDate(claim.observed_at) : "Unknown"}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+          Revisions
+        </div>
+        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {claim.revisions.length ? (
+            claim.revisions.map((revision) => (
+              <div
+                key={revision.id}
+                className={
+                  revision.id === winningRevisionId
+                    ? "bg-emerald-50/70 p-3"
+                    : revision.status === "disputed"
+                      ? "bg-amber-50/70 p-3"
+                      : "p-3"
+                }
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{revision.status}</Badge>
+                      {revision.id === winningRevisionId ? (
+                        <Badge variant="outline" className="border-emerald-200 bg-emerald-100 text-emerald-800">
+                          current winner
+                        </Badge>
+                      ) : null}
+                      {revision.source_service ? (
+                        <span className="text-xs font-medium text-slate-600">
+                          {revision.source_service}
+                        </span>
+                      ) : null}
+                      {revision.source_domain && revision.source_field ? (
+                        <Badge variant="outline" className="font-mono text-[11px]">
+                          {revision.source_domain}.{revision.source_field}
+                        </Badge>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 break-words text-sm font-medium text-slate-950">
+                      {revision.asserted_value}
+                    </div>
+                    {revision.source_event_key ? (
+                      <div className="mt-1 max-w-xl truncate font-mono text-xs text-slate-500">
+                        {revision.source_event_key}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-xs text-slate-500 sm:text-right">
+                    <div>authority {revision.authority_priority}</div>
+                    <div>confidence {revision.confidence_score.toFixed(2)}</div>
+                    <div>{revision.observed_at ? formatDate(revision.observed_at) : formatDate(revision.created_at)}</div>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <EvidenceRefsList refs={revision.evidence_refs} />
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-4 text-sm text-slate-500">No revisions recorded.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -316,6 +468,14 @@ export default function SourcesPage() {
   const [eventFilters, setEventFilters] = useState({
     externalUserId: "",
     sourceService: "all",
+  });
+  const [claimUserDraft, setClaimUserDraft] = useState("");
+  const [claimStatusDraft, setClaimStatusDraft] = useState("all");
+  const [claimCategoryDraft, setClaimCategoryDraft] = useState("all");
+  const [claimFilters, setClaimFilters] = useState({
+    externalUserId: "",
+    status: "all",
+    category: "all",
   });
 
   const writers = useSWR(
@@ -341,19 +501,34 @@ export default function SourcesPage() {
       }),
     { refreshInterval: 15_000 },
   );
+  const claims = useSWR(
+    isLoaded
+      ? ["tenant-memory-claims", claimFilters.externalUserId, claimFilters.status, claimFilters.category]
+      : null,
+    () =>
+      listMemoryClaims(getToken, {
+        externalUserId: claimFilters.externalUserId || undefined,
+        status: claimFilters.status,
+        category: claimFilters.category,
+        limit: 50,
+      }),
+    { refreshInterval: 15_000 },
+  );
 
   const writerRows = useMemo(() => writers.data ?? [], [writers.data]);
   const eventRows = useMemo(() => events.data ?? [], [events.data]);
+  const claimRows = useMemo(() => claims.data ?? [], [claims.data]);
   const activeKeys = apiKeys.data?.data ?? [];
-  const errorMessage = displayApiError(writers.error ?? events.error ?? apiKeys.error);
+  const errorMessage = displayApiError(writers.error ?? events.error ?? claims.error ?? apiKeys.error);
   const metrics = useMemo(
     () => ({
       activeWriters: writerRows.filter((writer) => writer.is_active).length,
       boundWriters: writerRows.filter((writer) => writer.api_key_id).length,
       events: eventRows.length,
       services: new Set(eventRows.map((event) => event.source_service)).size,
+      disputedClaims: claimRows.filter((claim) => claim.status === "disputed").length,
     }),
-    [eventRows, writerRows],
+    [claimRows, eventRows, writerRows],
   );
 
   function openCreateWriter() {
@@ -449,13 +624,13 @@ export default function SourcesPage() {
           onRetry={() => void events.mutate()}
         />
         <MetricCard
-          title="Observed Services"
-          value={metrics.services.toLocaleString("en-IN")}
-          description="Distinct services represented in this event view"
-          icon={DatabaseZap}
-          loading={events.isLoading && !events.data}
+          title="Disputed Claims"
+          value={metrics.disputedClaims.toLocaleString("en-IN")}
+          description="Claim records where trusted sources disagree"
+          icon={GitCompareArrows}
+          loading={claims.isLoading && !claims.data}
           error={errorMessage}
-          onRetry={() => void events.mutate()}
+          onRetry={() => void claims.mutate()}
         />
       </section>
 
@@ -463,6 +638,7 @@ export default function SourcesPage() {
         <TabsList className="h-10">
           <TabsTrigger value="writers" className="px-4">Service writers</TabsTrigger>
           <TabsTrigger value="events" className="px-4">Source events</TabsTrigger>
+          <TabsTrigger value="claims" className="px-4">Claim ledger</TabsTrigger>
         </TabsList>
 
         <TabsContent value="writers">
@@ -698,6 +874,98 @@ export default function SourcesPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="claims">
+          <Card>
+            <CardHeader>
+              <CardTitle>Claim ledger</CardTitle>
+              <CardDescription>
+                See the active claim MemoryOS believes, the competing revisions behind it,
+                and the source evidence used to choose a winner.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 xl:flex-row xl:items-end">
+                <label className="flex-1 space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    External user ID
+                  </span>
+                  <Input
+                    placeholder="customer_001"
+                    value={claimUserDraft}
+                    onChange={(event) => setClaimUserDraft(event.target.value)}
+                  />
+                </label>
+                <label className="min-w-44 space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Status
+                  </span>
+                  <Select value={claimStatusDraft} onValueChange={setClaimStatusDraft}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All statuses</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="disputed">Disputed</SelectItem>
+                      <SelectItem value="superseded">Superseded</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label className="min-w-48 space-y-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Category
+                  </span>
+                  <Select value={claimCategoryDraft} onValueChange={setClaimCategoryDraft}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All categories</SelectItem>
+                      {MEMORY_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <Button
+                  onClick={() =>
+                    setClaimFilters({
+                      externalUserId: claimUserDraft.trim(),
+                      status: claimStatusDraft,
+                      category: claimCategoryDraft,
+                    })
+                  }
+                >
+                  <Filter className="mr-2 size-4" />
+                  Apply filters
+                </Button>
+                <Button variant="outline" onClick={() => void claims.mutate()}>
+                  <RefreshCw className="mr-2 size-4" />
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                Claims are normalized facts behind memories. A memory can be archived or
+                disputed, but its source-backed claim revision stays inspectable.
+              </div>
+
+              <div className="space-y-3">
+                {claimRows.length ? (
+                  claimRows.map((claim) => <ClaimCard key={claim.id} claim={claim} />)
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-12 text-center text-sm text-slate-500">
+                    No claims match the current filters. New claims appear as sourced memories are extracted.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
