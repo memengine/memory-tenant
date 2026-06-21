@@ -298,6 +298,47 @@ export type MemorySourceEvent = {
   extraction_job_id: string | null;
 };
 
+export type MemoryClaimRevision = {
+  id: string;
+  memory_id: string | null;
+  source_event_id: string | null;
+  source_writer_id: string | null;
+  source_domain: string | null;
+  source_domain_record_id: string | null;
+  source_field: string | null;
+  source_service: string | null;
+  source_event_key: string | null;
+  asserted_value: string;
+  status: "asserted" | "activated" | "superseded" | "rejected" | "disputed" | "archived";
+  authority_priority: number;
+  confidence_score: number;
+  observed_at: string | null;
+  evidence_refs: EvidenceReference[];
+  resolution_reason: string | null;
+  created_at: string;
+};
+
+export type MemoryClaim = {
+  id: string;
+  external_user_id: string;
+  category: string;
+  claim_fingerprint: string;
+  subject_key: string;
+  predicate_key: string;
+  scope: Record<string, unknown>;
+  active_value: string | null;
+  status: "active" | "superseded" | "disputed" | "archived";
+  active_memory_id: string | null;
+  winning_revision_id: string | null;
+  authority_priority: number;
+  confidence_score: number;
+  observed_at: string | null;
+  effective_at: string;
+  created_at: string;
+  updated_at: string;
+  revisions: MemoryClaimRevision[];
+};
+
 export type MemoryCategory =
   | "preference"
   | "fact"
@@ -939,6 +980,34 @@ export async function listSourceEvents(
   }
   const response = await apiFetch<Envelope<MemorySourceEvent[]>>(
     `/v1/tenant/source-events?${search.toString()}`,
+    getToken,
+  );
+  return response.data;
+}
+
+export async function listMemoryClaims(
+  getToken: TokenGetter,
+  options?: {
+    externalUserId?: string;
+    status?: string;
+    category?: string;
+    limit?: number;
+  },
+): Promise<MemoryClaim[]> {
+  const search = new URLSearchParams({
+    limit: String(options?.limit ?? 50),
+  });
+  if (options?.externalUserId) {
+    search.set("external_user_id", options.externalUserId);
+  }
+  if (options?.status && options.status !== "all") {
+    search.set("status", options.status);
+  }
+  if (options?.category && options.category !== "all") {
+    search.set("category", options.category);
+  }
+  const response = await apiFetch<Envelope<MemoryClaim[]>>(
+    `/v1/tenant/claims?${search.toString()}`,
     getToken,
   );
   return response.data;
