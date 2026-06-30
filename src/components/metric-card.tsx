@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -29,8 +28,7 @@ export function MetricCard({
   return (
     <Card className="min-h-[170px]">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="space-y-1">
-          <CardDescription>{title}</CardDescription>
+        <div>
           <CardTitle className="text-base text-slate-950">{title}</CardTitle>
         </div>
         <div className="rounded-xl bg-slate-100 p-2.5 text-slate-700">
@@ -45,7 +43,7 @@ export function MetricCard({
           </div>
         ) : error ? (
           <div className="space-y-3">
-            <div className="text-sm font-medium text-rose-700">{error}</div>
+            <div className="text-sm font-medium leading-6 text-rose-700">{error}</div>
             {onRetry ? (
               <Button variant="outline" size="sm" onClick={onRetry}>
                 Retry
