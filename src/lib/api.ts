@@ -16,12 +16,32 @@ export function displayApiError(error: unknown): string | undefined {
   if (!error) {
     return undefined;
   }
+
   const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
   if (message === "tenant_auth_required") {
     return "Select or create a workspace to load tenant data.";
   }
   if (message === "tenant_not_found") {
     return "Workspace data is still being created. Refresh once, then try again.";
+  }
+  if (
+    normalized.includes("clerkjs") ||
+    normalized.includes("clerk:") ||
+    normalized.includes("clerk.accounts") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("network error") ||
+    normalized.includes("load failed")
+  ) {
+    return "Connection issue. Check your internet connection and try again.";
+  }
+  if (normalized.includes("jwt") || normalized.includes("token") || normalized.includes("session")) {
+    return "Your session could not be refreshed. Sign in again if retry does not work.";
+  }
+  if (/https?:\/\//i.test(message)) {
+    return "The request could not be completed. Please try again.";
   }
   return message;
 }
@@ -226,6 +246,52 @@ export type QualityLogEntry = {
   quality_score: number;
   semantic_similarity: number | null;
   created_at: string;
+};
+
+
+export type PendingExtractionCandidate = {
+  id: string;
+  external_user_id: string;
+  content: string;
+  category: string;
+  confidence_score: number;
+  importance_score: number;
+  reinforcement_count: number;
+  candidate_reason: string;
+  status: "pending" | "promoted" | "dismissed" | "expired";
+  last_seen_at: string;
+  updated_at: string;
+};
+
+export type RetrievalFeedbackEntry = {
+  id: string;
+  external_user_id: string;
+  outcome:
+    | "used_successfully"
+    | "used_partially"
+    | "ignored"
+    | "not_useful"
+    | "user_corrected"
+    | "clarification_needed";
+  correction: string | null;
+  agent_confidence: number | null;
+  correction_job_id: string | null;
+  created_at: string;
+};
+
+export type ExtractionIntelligence = {
+  pending_candidates: number;
+  promoted_candidates_7d: number;
+  dismissed_candidates_7d: number;
+  reinforced_candidates: number;
+  feedback_events_7d: number;
+  corrections_queued_7d: number;
+  clarification_feedback_7d: number;
+  negative_feedback_7d: number;
+  candidate_status_breakdown: Record<string, number>;
+  feedback_outcome_breakdown: Record<string, number>;
+  recent_candidates: PendingExtractionCandidate[];
+  recent_feedback: RetrievalFeedbackEntry[];
 };
 
 export type MemoryAdditionPoint = {
@@ -787,6 +853,16 @@ export async function getRecentActivity(
   }));
 }
 
+
+export async function getExtractionIntelligence(
+  getToken: TokenGetter,
+): Promise<ExtractionIntelligence> {
+  const response = await apiFetch<Envelope<ExtractionIntelligence>>(
+    "/v1/tenant/extraction-intelligence",
+    getToken,
+  );
+  return response.data;
+}
 export async function getMemoryAdditions(
   getToken: TokenGetter,
 ): Promise<MemoryAdditionPoint[]> {
@@ -1190,3 +1266,5 @@ export async function deleteMemory(
 
   return response.data.deleted;
 }
+
+
