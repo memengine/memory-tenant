@@ -37,6 +37,19 @@ const quickStartSteps = [
       ")",
     ].join("\n"),
   },
+  {
+    step: "Step 4",
+    title: "Close the loop",
+    description: "Send feedback when retrieved memory was useful, wrong, or missing.",
+    code: [
+      "if memories.retrieval_id:",
+      "    mem.feedback(",
+      "        retrieval_id=memories.retrieval_id,",
+      '        outcome="clarification_needed",',
+      '        correction="User clarified they prefer Hindi replies.",',
+      "    )",
+    ].join("\n"),
+  },
 ] as const;
 
 type SdkQuickstartProps = {
@@ -59,7 +72,7 @@ export function SdkQuickstart({ emptyState = false }: SdkQuickstartProps) {
           <CardTitle>Quick start your SDK integration</CardTitle>
           <p className="mt-2 text-sm text-slate-600">
             Start with the SDK flow only: install the package, add your API key to
-            environment variables, then call <code>mem.add()</code> and <code>mem.get()</code>.
+            environment variables, then call <code>mem.add()</code>, <code>mem.get()</code>, and <code>mem.feedback()</code> when the agent learns a retrieved memory was wrong or missing.
           </p>
         </div>
       </CardHeader>
@@ -70,7 +83,7 @@ export function SdkQuickstart({ emptyState = false }: SdkQuickstartProps) {
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-4">
           {quickStartSteps.map((item) => (
             <div
               key={item.step}
@@ -91,3 +104,5 @@ export function SdkQuickstart({ emptyState = false }: SdkQuickstartProps) {
     </Card>
   );
 }
+
+
