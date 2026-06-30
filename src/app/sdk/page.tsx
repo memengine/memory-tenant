@@ -160,7 +160,7 @@ memoryos-mcp`}</code>
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle>1. Create an API key</CardTitle>
@@ -208,7 +208,27 @@ memoryos-mcp`}</code>
             </pre>
           </CardContent>
         </Card>
+
+        <Card className="border-sky-200 bg-sky-50/50">
+          <CardHeader>
+            <CardTitle>4. Send retrieval feedback</CardTitle>
+            <CardDescription>
+              Use the retrieval ID when the answer was corrected or the agent had to ask for missing context.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+              <code>{`if result.retrieval_id:
+    mem.feedback(
+        retrieval_id=result.retrieval_id,
+        outcome="user_corrected",
+        correction="Actually, the user prefers Hindi replies.",
+    )`}</code>
+            </pre>
+          </CardContent>
+        </Card>
       </section>
     </div>
   );
 }
+
