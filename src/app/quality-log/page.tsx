@@ -4,15 +4,17 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import { AlertTriangle, Gauge, Layers3, ShieldAlert, X } from "lucide-react";
+import { AlertTriangle, Brain, Gauge, Layers3, MessageSquareText, ShieldAlert, Sparkles, UserRound, X } from "lucide-react";
 
 import { MetricCard } from "@/components/metric-card";
 import { QualityLogTable } from "@/components/quality-log-table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   displayApiError,
   getAllTenantQualityLogEntries,
+  getExtractionIntelligence,
   type QualityLogEntry,
 } from "@/lib/api";
 
@@ -27,6 +29,15 @@ function isNothingToExtract(row: QualityLogEntry): boolean {
   );
 }
 
+function formatShortId(value: string): string {
+  return value.length > 22 ? `${value.slice(0, 12)}...${value.slice(-6)}` : value;
+}
+
+function signalTone(value: number): string {
+  return value > 0
+    ? "border-amber-200 bg-amber-50 text-amber-900"
+    : "border-emerald-200 bg-emerald-50 text-emerald-900";
+}
 function applyDateRange(rows: QualityLogEntry[], range: DateRangeFilter): QualityLogEntry[] {
   const now = Date.now();
   const windowMs =
@@ -52,6 +63,12 @@ export default function QualityLogPage() {
   const qualityLog = useSWR(
     isLoaded ? "tenant-quality-log-screen" : null,
     () => getAllTenantQualityLogEntries(getToken),
+    { refreshInterval: 60_000 },
+  );
+
+  const extractionIntelligence = useSWR(
+    isLoaded ? "tenant-extraction-intelligence" : null,
+    () => getExtractionIntelligence(getToken),
     { refreshInterval: 60_000 },
   );
 
@@ -120,6 +137,8 @@ export default function QualityLogPage() {
   }, [filteredRows, layerFilter, qualityLog.data]);
 
   const errorMessage = displayApiError(qualityLog.error);
+  const extractionError = displayApiError(extractionIntelligence.error);
+  const extraction = extractionIntelligence.data;
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
@@ -174,6 +193,7 @@ export default function QualityLogPage() {
         />
       </section>
 
+
       <Card>
         <CardContent className="pt-6">
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -194,6 +214,104 @@ export default function QualityLogPage() {
       </Card>
 
       <Card>
+        <CardContent className="space-y-5 pt-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl">
+              <h2 className="text-lg font-semibold text-slate-950">Extraction intelligence</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Borderline memories are held as weak signals until repeated evidence or feedback makes them useful. This view helps you catch quality drift before it reaches users.
+              </p>
+            </div>
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 xl:w-auto">
+              <div className={`rounded-2xl border px-4 py-3 ${signalTone(extraction?.pending_candidates ?? 0)}`}>
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"><Brain className="size-4" /> Weak</div>
+                <div className="mt-2 text-2xl font-semibold">{(extraction?.pending_candidates ?? 0).toLocaleString("en-IN")}</div>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"><Sparkles className="size-4" /> Reinforced</div>
+                <div className="mt-2 text-2xl font-semibold">{(extraction?.reinforced_candidates ?? 0).toLocaleString("en-IN")}</div>
+              </div>
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sky-900">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"><MessageSquareText className="size-4" /> Feedback</div>
+                <div className="mt-2 text-2xl font-semibold">{(extraction?.feedback_events_7d ?? 0).toLocaleString("en-IN")}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"><Layers3 className="size-4" /> Jobs</div>
+                <div className="mt-2 text-2xl font-semibold">{(extraction?.corrections_queued_7d ?? 0).toLocaleString("en-IN")}</div>
+              </div>
+            </div>
+          </div>
+
+          {extractionError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+              {extractionError}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <div className="font-medium text-slate-950">Recent weak candidates</div>
+                <p className="mt-1 text-xs text-slate-500">Candidates below store threshold but strong enough to watch.</p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {(extraction?.recent_candidates ?? []).length > 0 ? (
+                  extraction!.recent_candidates.map((candidate) => (
+                    <div key={candidate.id} className="space-y-3 px-4 py-4 transition hover:bg-slate-50">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="bg-slate-50 text-slate-700">{candidate.category}</Badge>
+                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">{candidate.status}</Badge>
+                        <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600">seen {candidate.reinforcement_count}x</span>
+                      </div>
+                      <p className="line-clamp-2 text-sm leading-6 text-slate-800">{candidate.content}</p>
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1"><UserRound className="size-3" />{formatShortId(candidate.external_user_id)}</span>
+                        <span>confidence {candidate.confidence_score.toFixed(2)}</span>
+                        <span>importance {candidate.importance_score.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-8 text-sm text-slate-500">No weak extraction candidates yet.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <div className="font-medium text-slate-950">Recent retrieval feedback</div>
+                <p className="mt-1 text-xs text-slate-500">Signals from agents after memory was retrieved and used.</p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {(extraction?.recent_feedback ?? []).length > 0 ? (
+                  extraction!.recent_feedback.map((feedback) => (
+                    <div key={feedback.id} className="space-y-3 px-4 py-4 transition hover:bg-slate-50">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">{feedback.outcome.replaceAll("_", " ")}</Badge>
+                        {feedback.correction_job_id ? (
+                          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-800">correction queued</Badge>
+                        ) : null}
+                      </div>
+                      {feedback.correction ? (
+                        <p className="line-clamp-2 text-sm leading-6 text-slate-800">{feedback.correction}</p>
+                      ) : (
+                        <p className="text-sm leading-6 text-slate-500">No correction text provided.</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1"><UserRound className="size-3" />{formatShortId(feedback.external_user_id)}</span>
+                        <span>{new Date(feedback.created_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-8 text-sm text-slate-500">No retrieval feedback yet. Feedback will appear here when your app reports whether retrieved memory helped, was ignored, or needed correction.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
         <CardContent className="space-y-4 pt-6">
           <QualityLogTable
             rows={filteredRows}
@@ -210,3 +328,6 @@ export default function QualityLogPage() {
     </div>
   );
 }
+
+
+
