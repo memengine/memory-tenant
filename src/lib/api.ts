@@ -497,6 +497,36 @@ export type RetrieveMemoriesResponse = {
   clarification_question?: string | null;
   cached?: boolean;
 };
+export type AddMemoriesRequest = {
+  external_user_id: string;
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  agent_id?: string | null;
+  source?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+};
+
+export type AddMemoriesResponse = {
+  job_id?: string | null;
+  status?: string;
+  blocked_reason?: string | null;
+  request_id?: string;
+  timestamp?: string;
+  processing_status?: string | null;
+};
+
+export type MemoryJobStatus = {
+  job_id: string;
+  status: string;
+  memories_created?: number;
+  memories_extracted?: number;
+  pending_candidates_buffered?: number;
+  pending_candidates_promoted?: number;
+  attempts?: number;
+  error?: string | null;
+  error_summary?: string | null;
+  extraction_metadata?: Record<string, unknown> | null;
+};
+
 
 type Envelope<T> = {
   data: T;
@@ -1219,6 +1249,37 @@ export async function listMemories(
   );
 }
 
+export async function addMemories(
+  getToken: TokenGetter,
+  payload: AddMemoriesRequest,
+): Promise<AddMemoriesResponse> {
+  const response = await apiFetch<AddMemoriesResponse | Envelope<AddMemoriesResponse>>(
+    "/v1/memories/add",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+
+  return "data" in response && response.data && typeof response.data === "object"
+    ? response.data
+    : (response as AddMemoriesResponse);
+}
+
+export async function getMemoryJob(
+  getToken: TokenGetter,
+  jobId: string,
+): Promise<MemoryJobStatus> {
+  const response = await apiFetch<Envelope<MemoryJobStatus> | MemoryJobStatus>(
+    `/v1/memories/jobs/${encodeURIComponent(jobId)}`,
+    getToken,
+  );
+
+  return "data" in response && response.data && typeof response.data === "object"
+    ? response.data
+    : (response as MemoryJobStatus);
+}
 export async function retrieveMemories(
   getToken: TokenGetter,
   payload: RetrieveMemoriesRequest,
