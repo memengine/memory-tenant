@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Copy, ExternalLink, Lock, RotateCcw } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { addMemories, displayApiError, getMemoryJob, retrieveMemories, type MemoryJobStatus, type MemoryRecord } from "@/lib/api";
 
 type Screen =
   | "engine"
@@ -26,6 +28,42 @@ type Screen =
 
 type EngineKind = "general" | "domain" | null;
 type ModeKind = "single" | "conflict" | "passport" | null;
+
+type LiveRunResult = {
+  userId: string;
+  jobIds: string[];
+  jobs: MemoryJobStatus[];
+  memories: MemoryRecord[];
+  prompt: string;
+  summary: string;
+  error?: string;
+};
+
+function makePlaygroundUserId(prefix: string) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID().slice(0, 8)
+    : String(Date.now()).slice(-8);
+  return `${prefix}_${random}`;
+}
+
+function isJobDone(job: MemoryJobStatus) {
+  const status = job.status.toLowerCase();
+  return ["completed", "complete", "processed", "success", "failed", "dead", "error"].includes(status);
+}
+
+function isJobFailed(job: MemoryJobStatus) {
+  const status = job.status.toLowerCase();
+  return ["failed", "dead", "error"].includes(status) || Boolean(job.error || job.error_summary);
+}
+
+function memoryRecordsToList(records: MemoryRecord[]) {
+  return records.map((memory) => ({
+    text: memory.content,
+    score: `${Number(memory.importance_score ?? 0).toFixed(1)}`,
+    tag: `${memory.category}${memory.provenance?.service ? ` via ${memory.provenance.service}` : ""}`,
+  }));
+}
+
 
 type Tab = {
   id: string;
@@ -189,8 +227,67 @@ function MemoryList({ items }: { items: Array<{ text: string; score: string; tag
 function CodeBlock({ code }: { code: string }) {
   return <pre className="overflow-auto rounded-2xl bg-zinc-950 p-5 text-lg leading-8 text-violet-200">{code}</pre>;
 }
+function JobSummary({ jobs }: { jobs: MemoryJobStatus[] }) {
+  if (!jobs.length) {
+    return <p>No extraction job was created. The quality gate may have blocked or skipped this turn.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {jobs.map((job) => (
+        <div key={job.job_id} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="font-semibold text-white">{job.job_id}</p>
+            <span className="rounded-full border border-violet-500 px-4 py-2 text-base font-semibold text-violet-200">
+              {job.status}
+            </span>
+          </div>
+          <p className="mt-3 text-xl text-zinc-400">
+            stored {job.memories_created ?? job.memories_extracted ?? 0} · buffered {job.pending_candidates_buffered ?? 0} · attempts {job.attempts ?? 0}
+          </p>
+          {job.error_summary || job.error ? <p className="mt-3 text-xl text-red-300">{job.error_summary ?? job.error}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ResultSummary({ result }: { result: LiveRunResult | null }) {
+  if (!result) {
+    return <p>Waiting for live backend result...</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <p>{result.summary}</p>
+      <p className="text-xl text-zinc-400">External user ID: {result.userId}</p>
+      {result.error ? <p className="rounded-2xl border border-red-900 bg-red-950/40 p-5 text-red-200">{result.error}</p> : null}
+    </div>
+  );
+}
+function PassportProductionNote() {
+  return (
+    <div className="mb-6 w-full max-w-4xl rounded-[1.5rem] border border-sky-500 bg-sky-950/40 p-6 text-left shadow-[0_0_40px_rgba(14,165,233,0.16)]">
+      <p className="text-lg font-semibold uppercase tracking-[0.24em] text-sky-300">
+        Real Memory Passport setup
+      </p>
+      <p className="mt-4 text-2xl leading-9 text-white">
+        This screen is a guided preview. For the real Passport experience, create a Passport agent in the tenant dashboard, copy the agent ID, then send users through a consent URL or secure-link connector.
+      </p>
+      <div className="mt-5 grid gap-3 text-xl leading-8 text-sky-100 md:grid-cols-3">
+        <div className="rounded-2xl border border-sky-800 bg-black/30 p-4">1. Create Passport agent</div>
+        <div className="rounded-2xl border border-sky-800 bg-black/30 p-4">2. Open consent or connector link</div>
+        <div className="rounded-2xl border border-sky-800 bg-black/30 p-4">3. User approves scope and can revoke later</div>
+      </div>
+      <p className="mt-5 text-lg text-sky-200">
+        Go to Tenant Dashboard → Memory Passport to create the live agent identity and test with a real grant.
+      </p>
+    </div>
+  );
+}
 
 export default function PlaygroundPage() {
+  const { getToken } = useAuth();
   const [screen, setScreen] = useState<Screen>("engine");
   const [previousScreen, setPreviousScreen] = useState<Screen>("engine");
   const [engine, setEngine] = useState<EngineKind>(null);
@@ -199,15 +296,8 @@ export default function PlaygroundPage() {
   const [agentTwo, setAgentTwo] = useState(defaultAgentTwo);
   const [passportAgent, setPassportAgent] = useState("Python Coding Assistant");
   const [copyLabel, setCopyLabel] = useState("Share Results");
-
-  const singleMemories = useMemo(
-    () => [
-      { text: "User prefers concise technical answers.", score: "9.1" },
-      { text: "User mostly works in Python.", score: "8.4" },
-      { text: "User is building an AI support product.", score: "8.0" },
-    ],
-    [],
-  );
+  const [singleResult, setSingleResult] = useState<LiveRunResult | null>(null);
+  const [conflictResult, setConflictResult] = useState<LiveRunResult | null>(null);
 
   async function initialize(nextEngine: Exclude<EngineKind, null>) {
     setEngine(nextEngine);
@@ -222,6 +312,150 @@ export default function PlaygroundPage() {
     setScreen(loading);
     await sleep(ms);
     setScreen(next);
+  }
+  async function pollJob(jobId: string): Promise<MemoryJobStatus> {
+    let latest: MemoryJobStatus | null = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      latest = await getMemoryJob(getToken, jobId);
+      if (isJobDone(latest)) {
+        return latest;
+      }
+      await sleep(2_000);
+    }
+
+    return latest ?? { job_id: jobId, status: "processing" };
+  }
+
+  async function runSingleLive() {
+    const userId = makePlaygroundUserId("playground_single");
+    setPreviousScreen(screen);
+    setSingleResult(null);
+    setScreen("single-processing");
+
+    try {
+      const addResult = await addMemories(getToken, {
+        external_user_id: userId,
+        messages: [
+          { role: "user", content: singleMemory },
+          { role: "assistant", content: "I will remember the durable context that helps future sessions." },
+        ],
+        source: {
+          service: "tenant-playground",
+          event_id: `single-${userId}`,
+          scope: { demo: "single-agent" },
+        },
+        metadata: { source: "tenant_playground" },
+      });
+
+      const jobs = addResult.job_id ? [await pollJob(addResult.job_id)] : [];
+      const retrieved = await retrieveMemories(getToken, {
+        external_user_id: userId,
+        query: singleMemory,
+        limit: 8,
+        format: "bullets",
+        context_max_tokens: 700,
+      });
+      const created = jobs.reduce((total, job) => total + (job.memories_created ?? job.memories_extracted ?? 0), 0);
+      const buffered = jobs.reduce((total, job) => total + (job.pending_candidates_buffered ?? 0), 0);
+      const failedJob = jobs.find(isJobFailed);
+
+      setSingleResult({
+        userId,
+        jobIds: addResult.job_id ? [addResult.job_id] : [],
+        jobs,
+        memories: retrieved.data,
+        prompt: retrieved.system_prompt_addition,
+        summary: failedJob
+          ? `Extraction job finished with an error: ${failedJob.error_summary ?? failedJob.error ?? "unknown error"}.`
+          : `${created} memories stored${buffered ? `, ${buffered} weak signals buffered` : ""}. Retrieval returned ${retrieved.data.length} records.`,
+      });
+    } catch (caught) {
+      setSingleResult({
+        userId,
+        jobIds: [],
+        jobs: [],
+        memories: [],
+        prompt: "",
+        summary: "Live backend call failed.",
+        error: displayApiError(caught) ?? "Unable to run the live playground right now.",
+      });
+    } finally {
+      setScreen("single-result");
+    }
+  }
+
+  async function runConflictLive() {
+    const userId = makePlaygroundUserId("playground_conflict");
+    setPreviousScreen(screen);
+    setConflictResult(null);
+    setScreen("conflict-processing");
+
+    try {
+      const supportFirst = await addMemories(getToken, {
+        external_user_id: userId,
+        messages: [
+          { role: "user", content: `Support note from ${agentTwo.name}: ${agentTwo.claim}` },
+          { role: "assistant", content: `${agentTwo.name} reported: ${agentTwo.claim}` },
+        ],
+        source: {
+          service: agentTwo.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "support-agent",
+          event_id: `conflict-support-${userId}`,
+          scope: { authority: agentTwo.authority, demo: "multi-service-conflict" },
+        },
+        metadata: { source: "tenant_playground", authority: agentTwo.authority },
+      });
+
+      const billingSecond = await addMemories(getToken, {
+        external_user_id: userId,
+        messages: [
+          { role: "user", content: `Billing note from ${agentOne.name}: ${agentOne.claim}` },
+          { role: "assistant", content: `${agentOne.name} reported: ${agentOne.claim}` },
+        ],
+        source: {
+          service: agentOne.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "billing-agent",
+          event_id: `conflict-billing-${userId}`,
+          scope: { authority: agentOne.authority, demo: "multi-service-conflict" },
+        },
+        metadata: { source: "tenant_playground", authority: agentOne.authority },
+      });
+
+      const jobIds = [supportFirst.job_id, billingSecond.job_id].filter((value): value is string => Boolean(value));
+      const jobs = [] as MemoryJobStatus[];
+      for (const jobId of jobIds) {
+        jobs.push(await pollJob(jobId));
+      }
+
+      const retrieved = await retrieveMemories(getToken, {
+        external_user_id: userId,
+        query: "What is the current subscription plan or account status for this user?",
+        limit: 10,
+        format: "bullets",
+        context_max_tokens: 900,
+      });
+      const created = jobs.reduce((total, job) => total + (job.memories_created ?? job.memories_extracted ?? 0), 0);
+      const buffered = jobs.reduce((total, job) => total + (job.pending_candidates_buffered ?? 0), 0);
+
+      setConflictResult({
+        userId,
+        jobIds,
+        jobs,
+        memories: retrieved.data,
+        prompt: retrieved.system_prompt_addition,
+        summary: `${created} memories stored${buffered ? `, ${buffered} weak signals buffered` : ""}. Retrieval returned ${retrieved.data.length} records from the live backend.`,
+      });
+    } catch (caught) {
+      setConflictResult({
+        userId,
+        jobIds: [],
+        jobs: [],
+        memories: [],
+        prompt: "",
+        summary: "Live backend call failed.",
+        error: displayApiError(caught) ?? "Unable to run the live conflict demo right now.",
+      });
+    } finally {
+      setScreen("conflict-result");
+    }
   }
 
   function chooseMode(nextMode: Exclude<ModeKind, null>) {
@@ -321,7 +555,7 @@ export default function PlaygroundPage() {
             value={singleMemory}
             onChange={(event) => setSingleMemory(event.target.value)}
           />
-          <PrimaryButton onClick={() => void runProcessing("single-result", "single-processing")} disabled={!singleMemory.trim()}>
+          <PrimaryButton onClick={() => void runSingleLive()} disabled={!singleMemory.trim()}>
             Store Memory
           </PrimaryButton>
         </div>
@@ -338,15 +572,17 @@ export default function PlaygroundPage() {
   }
 
   if (screen === "single-result") {
+    const memoryItems = singleResult?.memories.length ? memoryRecordsToList(singleResult.memories) : [];
     return (
       <Shell onBack={back}>
-        <StepTitle eyebrow="Single-agent memory" title="Your agent extracted 3 facts." />
+        <StepTitle eyebrow="Single-agent memory" title="Live extraction result" />
         <Tabs
           tabs={[
-            { id: "summary", label: "Summary", content: <p>Your agent now has durable context it can retrieve later instead of asking the user again.</p> },
-            { id: "memories", label: "Extracted Memories", content: <MemoryList items={singleMemories} /> },
-            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={`What you know about this user:\n- User prefers concise technical answers.\n- User mostly works in Python.\n- User is building an AI support product.`} /> },
-            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(\n    external_user_id="user_123",\n    messages=[{"role": "user", "content": "${singleMemory.replaceAll('"', '\\"')}"}],\n)`} /> },
+            { id: "summary", label: "Summary", content: <ResultSummary result={singleResult} /> },
+            { id: "memories", label: "Extracted Memories", content: memoryItems.length ? <MemoryList items={memoryItems} /> : <p>No retrievable memories yet. If a weak signal was buffered, repeat the same fact to reinforce it.</p> },
+            { id: "jobs", label: "Job Status", content: <JobSummary jobs={singleResult?.jobs ?? []} /> },
+            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={singleResult?.prompt || "No prompt context returned yet."} /> },
+            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(\n    external_user_id="${singleResult?.userId ?? "user_123"}",\n    messages=[{"role": "user", "content": "${singleMemory.replaceAll('"', '\\"')}"}],\n)\n\ncontext = mem.retrieve(\n    external_user_id="${singleResult?.userId ?? "user_123"}",\n    query="what should the agent remember?",\n)`} /> },
           ]}
         />
         <CompletionBar restart={restart} shareResults={() => void shareResults()} copyLabel={copyLabel} show={finalBar} />
@@ -381,7 +617,7 @@ export default function PlaygroundPage() {
           <ConflictPreview title={agentTwo.name} authority={agentTwo.authority} claim={agentTwo.claim} />
         </div>
         <div className="mt-10">
-          <PrimaryButton onClick={() => void runProcessing("conflict-result", "conflict-processing")}>Run MemoryOS</PrimaryButton>
+          <PrimaryButton onClick={() => void runConflictLive()}>Run MemoryOS</PrimaryButton>
         </div>
       </Shell>
     );
@@ -396,18 +632,20 @@ export default function PlaygroundPage() {
   }
 
   if (screen === "conflict-result") {
-    const winner = agentOne.name || "Billing Agent";
+    const memoryItems = conflictResult?.memories.length ? memoryRecordsToList(conflictResult.memories) : [];
+    const sourceLines = conflictResult?.memories.map((memory) => `${memory.content}\n  source: ${memory.provenance?.service ?? "unknown"}\n  event: ${memory.provenance?.event_id ?? memory.source_event_id ?? "unknown"}`).join("\n\n") ?? "No live source records returned.";
     return (
       <Shell onBack={back}>
-        <StepTitle eyebrow="Conflict detected" title={`Resolution: ${winner}'s fact is authoritative.`} />
+        <StepTitle eyebrow="Multi-service memory" title="Live conflict retrieval result" />
         <Tabs
           tabs={[
-            { id: "summary", label: "Summary", content: <p>MemoryOS surfaced both claims and applied the authority rule instead of silently trusting recency.</p> },
-            { id: "memories", label: "Extracted Memories", content: <MemoryList items={[{ text: agentOne.claim, score: "winner", tag: agentOne.authority }, { text: agentTwo.claim, score: "conflict", tag: agentTwo.authority }]} /> },
-            { id: "decision", label: "Conflict Decision", content: <p>{winner} won because it is marked as the source of truth for subscriptions. The losing claim is kept for audit/history, not deleted.</p> },
-            { id: "sources", label: "Sources", content: <CodeBlock code={`run_id: demo-run-001\nagent_1: ${agentOne.name}\nauthority: ${agentOne.authority}\nagent_2: ${agentTwo.name}\nauthority: ${agentTwo.authority}`} /> },
-            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={`Use this subscription context:\n- Current plan: Pro plan, $99/month.\n- Source: ${agentOne.name}.\n- Note: ${agentTwo.name} reported a conflicting downgrade; verify before refunding.`} /> },
-            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(external_user_id="cust_123", messages=[...], source={"service": "billing"})\nmem.add(external_user_id="cust_123", messages=[...], source={"service": "support"})\n\ncontext = mem.retrieve("cust_123", query="current subscription plan")`} /> },
+            { id: "summary", label: "Summary", content: <ResultSummary result={conflictResult} /> },
+            { id: "memories", label: "Extracted Memories", content: memoryItems.length ? <MemoryList items={memoryItems} /> : <p>No retrievable memories yet. Check job status to see whether the facts were buffered, skipped, or still processing.</p> },
+            { id: "jobs", label: "Job Status", content: <JobSummary jobs={conflictResult?.jobs ?? []} /> },
+            { id: "decision", label: "Retrieval Decision", content: <p>{conflictResult?.memories[0] ? `Top live retrieval result: ${conflictResult.memories[0].content}` : "No winning context was returned yet. Check whether extraction stored, buffered, or skipped the submitted claims."}</p> },
+            { id: "sources", label: "Sources", content: <CodeBlock code={sourceLines} /> },
+            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={conflictResult?.prompt || "No prompt context returned yet."} /> },
+            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(\n    external_user_id="${conflictResult?.userId ?? "cust_123"}",\n    messages=[...],\n    source={"service": "billing-agent"},\n)\nmem.add(\n    external_user_id="${conflictResult?.userId ?? "cust_123"}",\n    messages=[...],\n    source={"service": "support-agent"},\n)\n\ncontext = mem.retrieve(\n    external_user_id="${conflictResult?.userId ?? "cust_123"}",\n    query="current subscription plan",\n)`} /> },
           ]}
         />
         <CompletionBar restart={restart} shareResults={() => void shareResults()} copyLabel={copyLabel} show={finalBar} />
@@ -439,6 +677,7 @@ export default function PlaygroundPage() {
     return (
       <Shell onBack={back}>
         <StepTitle eyebrow="Memory Passport" title={`${passportAgent} can request user-approved memory.`} subtitle="Session managed internally by MemoryOS. Agent IDs and keys are not shown in the playground." />
+        <PassportProductionNote />
         <PassportMemory />
         <div className="mt-8">
           <PrimaryButton onClick={() => void openConsentPortal()}>
