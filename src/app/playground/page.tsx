@@ -1,570 +1,536 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
-import {
-  CheckCircle,
-  Copy,
-  Info,
-  Loader2,
-  MessageCircle,
-  Send,
-  Sparkles,
-  XCircle,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Copy, ExternalLink, Lock, RotateCcw } from "lucide-react";
 
-import { JobTracker } from "@/components/job-tracker";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+type Screen =
+  | "engine"
+  | "initializing"
+  | "mode"
+  | "single-input"
+  | "single-processing"
+  | "single-result"
+  | "conflict-agent-one"
+  | "conflict-agent-two"
+  | "conflict-run"
+  | "conflict-processing"
+  | "conflict-result"
+  | "passport-agent"
+  | "passport-processing"
+  | "passport-memory"
+  | "passport-consent"
+  | "passport-complete";
 
-type TimeRangeValue = "all" | "7" | "30";
-type ContextFormat = "bullets" | "json" | "xml";
+type EngineKind = "general" | "domain" | null;
+type ModeKind = "single" | "conflict" | "passport" | null;
 
-type MemorySearchResult = {
+type Tab = {
   id: string;
-  content: string;
-  category: string;
-  importance_score: number;
-  relevance_score?: number | null;
-  context_snippet?: string | null;
+  label: string;
+  content: React.ReactNode;
 };
 
-type RetrieveResponse = {
-  data?: MemorySearchResult[];
-  system_prompt_addition?: string;
-  context_token_count?: number;
-  clarification_question?: string | null;
-  cached?: boolean;
+const VIOLET = "#7C3AED";
+
+const defaultSingleMemory =
+  "User prefers concise technical answers, works mostly in Python, and is building an AI support product.";
+
+const defaultAgentOne = {
+  name: "Billing Agent",
+  authority: "Source of truth for subscriptions",
+  claim: "User is on Pro plan, $99/month.",
 };
 
-type AddResponse = {
-  job_id?: string | null;
-  status?: string;
-  blocked_reason?: string | null;
-  budget_remaining_pct?: number | null;
-  nothing_to_extract?: boolean;
+const defaultAgentTwo = {
+  name: "Support Agent",
+  authority: "Handles refunds and downgrades",
+  claim: "User downgraded to Basic last week.",
 };
 
-const TIME_RANGE_OPTIONS: Array<{ label: string; value: TimeRangeValue }> = [
-  { label: "All time", value: "all" },
-  { label: "Last 7 days", value: "7" },
-  { label: "Last 30 days", value: "30" },
-];
-
-function getPromptDisplay(value: string, format: ContextFormat): string {
-  if (format !== "json" || !value.trim()) {
-    return value;
-  }
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2);
-  } catch {
-    return value;
-  }
+function classNames(...values: Array<string | false | null | undefined>) {
+  return values.filter(Boolean).join(" ");
 }
 
-function unwrapRetrieve(payload: RetrieveResponse | { data?: RetrieveResponse }) {
-  const maybeEnvelope = payload as { data?: RetrieveResponse };
-  if (
-    maybeEnvelope.data &&
-    !Array.isArray(maybeEnvelope.data) &&
-    typeof maybeEnvelope.data === "object"
-  ) {
-    return maybeEnvelope.data;
-  }
-  return payload as RetrieveResponse;
+function sleep(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-const primaryButtonClassName =
-  "bg-sky-700 text-white shadow-sm hover:bg-sky-800 disabled:bg-slate-300 disabled:text-slate-500";
-const CONTEXT_MAX_TOKENS = 500;
+function SegmentedSpinner({ label }: { label: string }) {
+  return (
+    <div className="flex min-h-[440px] flex-col items-center justify-center text-center">
+      <div className="relative size-40 animate-spin rounded-full">
+        {Array.from({ length: 12 }).map((_, index) => (
+          <span
+            key={index}
+            className="absolute left-1/2 top-1/2 h-8 w-3 origin-[50%_72px] rounded-full"
+            style={{
+              backgroundColor: VIOLET,
+              opacity: 0.25 + index * 0.055,
+              transform: `translate(-50%, -72px) rotate(${index * 30}deg)`,
+            }}
+          />
+        ))}
+      </div>
+      <h1 className="mt-10 text-[2.5rem] font-semibold leading-tight text-white">{label}</h1>
+      <p className="mt-4 max-w-xl text-2xl leading-9 text-zinc-400">
+        MemoryOS is preparing the memory pipeline, source checks, and retrieval context.
+      </p>
+    </div>
+  );
+}
 
-function AddResultExplainer({ result }: { result: AddResponse | null }) {
-  if (!result) {
-    return null;
-  }
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute left-8 top-8 z-10 text-xl font-medium text-white transition hover:text-violet-300"
+    >
+      ← Back
+    </button>
+  );
+}
 
-  const wasStored = result.status === "queued" && !result.nothing_to_extract;
-  const blocked = result.status === "blocked";
+function Shell({ children, onBack }: { children: React.ReactNode; onBack?: () => void }) {
+  return (
+    <main className="relative -m-6 min-h-[calc(100vh-2rem)] bg-black px-6 py-16 text-white md:-m-8 md:px-10">
+      {onBack ? <BackButton onClick={onBack} /> : null}
+      <div className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-5xl flex-col items-center justify-center transition-opacity duration-300">
+        {children}
+      </div>
+    </main>
+  );
+}
+
+function BigOption({ title, subtitle, onClick }: { title: string; subtitle: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-[2rem] border border-zinc-800 bg-zinc-950 p-8 text-left transition duration-300 hover:-translate-y-1 hover:border-violet-500 hover:bg-zinc-900"
+    >
+      <h2 className="text-[2.5rem] font-semibold leading-tight text-white">{title}</h2>
+      <p className="mt-3 text-2xl leading-9 text-zinc-400">{subtitle}</p>
+    </button>
+  );
+}
+
+function StepTitle({ eyebrow, title, subtitle }: { eyebrow?: string; title: string; subtitle?: string }) {
+  return (
+    <div className="mb-10 text-center">
+      {eyebrow ? <p className="mb-4 text-lg font-semibold uppercase tracking-[0.28em] text-violet-400">{eyebrow}</p> : null}
+      <h1 className="text-[2.5rem] font-semibold leading-tight text-white">{title}</h1>
+      {subtitle ? <p className="mt-4 max-w-3xl text-2xl leading-9 text-zinc-400">{subtitle}</p> : null}
+    </div>
+  );
+}
+
+function PrimaryButton({ children, onClick, disabled }: { children: React.ReactNode; onClick: () => void; disabled?: boolean }) {
+  return (
+    <Button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="h-16 rounded-2xl px-8 text-xl font-semibold text-white hover:opacity-90 disabled:opacity-40"
+      style={{ backgroundColor: VIOLET }}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function Tabs({ tabs }: { tabs: Tab[] }) {
+  const [active, setActive] = useState(tabs[0]?.id ?? "");
+  const activeTab = tabs.find((tab) => tab.id === active) ?? tabs[0];
 
   return (
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardContent className="space-y-3 pt-5">
-        {wasStored ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-            <div className="flex items-center gap-2 font-semibold">
-              <CheckCircle className="size-4" />
-              Memory will be stored
-            </div>
-            <p className="mt-1 text-emerald-800/80">
-              The request queued successfully. Track the job below until
-              extraction completes.
-            </p>
-          </div>
-        ) : null}
-
-        {result.nothing_to_extract ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            <div className="flex items-center gap-2 font-semibold">
-              <Info className="size-4" />
-              Nothing to extract
-            </div>
-            <p className="mt-1 text-amber-900/80">
-              This conversation had no storable facts. Try a more informative
-              message.
-            </p>
-          </div>
-        ) : null}
-
-        {blocked ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
-            <div className="flex items-center gap-2 font-semibold">
-              <XCircle className="size-4" />
-              Blocked by quality gate
-            </div>
-            <p className="mt-1 text-rose-800/80">
-              {result.blocked_reason ?? "No blocked reason was returned."}
-            </p>
-          </div>
-        ) : null}
-
-        <pre className="max-h-52 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-5 text-slate-100">
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      </CardContent>
-    </Card>
+    <div className="w-full rounded-[2rem] border border-zinc-800 bg-zinc-950 p-5">
+      <div className="mb-5 flex flex-wrap gap-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActive(tab.id)}
+            className={classNames(
+              "rounded-full border px-5 py-3 text-lg font-semibold transition",
+              active === tab.id ? "border-violet-500 bg-violet-600 text-white" : "border-zinc-800 bg-black text-zinc-300 hover:border-violet-500",
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-80 rounded-[1.5rem] border border-zinc-800 bg-black p-6 text-2xl leading-9 text-zinc-200">
+        {activeTab?.content}
+      </div>
+    </div>
   );
+}
+
+function MemoryList({ items }: { items: Array<{ text: string; score: string; tag?: string }> }) {
+  return (
+    <div className="space-y-4">
+      {items.map((item) => (
+        <div key={item.text} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-2xl font-semibold text-white">{item.text}</p>
+            <span className="rounded-full bg-violet-600 px-4 py-2 text-base font-semibold text-white">{item.score}</span>
+          </div>
+          {item.tag ? <p className="mt-3 text-xl text-zinc-400">{item.tag}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CodeBlock({ code }: { code: string }) {
+  return <pre className="overflow-auto rounded-2xl bg-zinc-950 p-5 text-lg leading-8 text-violet-200">{code}</pre>;
 }
 
 export default function PlaygroundPage() {
-  const { isLoaded, getToken } = useAuth();
-  const [externalUserId, setExternalUserId] = useState("playground-user");
-  const [memoryText, setMemoryText] = useState(
-    "Please remember that I prefer concise technical answers with Python examples.",
-  );
-  const [query, setQuery] = useState("How should I answer this user?");
-  const [timeRange, setTimeRange] = useState<TimeRangeValue>("all");
-  const [format, setFormat] = useState<ContextFormat>("bullets");
-  const [addResult, setAddResult] = useState<AddResponse | null>(null);
-  const [retrieveResult, setRetrieveResult] = useState<RetrieveResponse | null>(
-    null,
-  );
-  const [submittingAdd, setSubmittingAdd] = useState(false);
-  const [submittingRetrieve, setSubmittingRetrieve] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copyLabel, setCopyLabel] = useState("Copy");
-  const [questionCopyLabel, setQuestionCopyLabel] = useState("Copy question");
-  const retrieveRefreshTimer = useRef<number | null>(null);
+  const [screen, setScreen] = useState<Screen>("engine");
+  const [previousScreen, setPreviousScreen] = useState<Screen>("engine");
+  const [engine, setEngine] = useState<EngineKind>(null);
+  const [singleMemory, setSingleMemory] = useState(defaultSingleMemory);
+  const [agentOne, setAgentOne] = useState(defaultAgentOne);
+  const [agentTwo, setAgentTwo] = useState(defaultAgentTwo);
+  const [passportAgent, setPassportAgent] = useState("Python Coding Assistant");
+  const [copyLabel, setCopyLabel] = useState("Share Results");
 
-  const promptAddition = useMemo(
-    () =>
-      getPromptDisplay(
-        retrieveResult?.system_prompt_addition ?? "",
-        format,
-      ),
-    [format, retrieveResult?.system_prompt_addition],
+  const singleMemories = useMemo(
+    () => [
+      { text: "User prefers concise technical answers.", score: "9.1" },
+      { text: "User mostly works in Python.", score: "8.4" },
+      { text: "User is building an AI support product.", score: "8.0" },
+    ],
+    [],
   );
 
-  async function apiRequest<T>(path: string, body: Record<string, unknown>) {
-    if (!API_BASE) {
-      throw new Error("NEXT_PUBLIC_API_BASE is not configured.");
-    }
-    const token = await getToken();
-    const response = await fetch(`${API_BASE}${path}`, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      let message = `Request failed with status ${response.status}`;
-      try {
-        const payload = (await response.json()) as {
-          error?: string;
-          detail?: string;
-        };
-        message = payload.error ?? payload.detail ?? message;
-      } catch {
-        // Keep the default message.
-      }
-      throw new Error(message);
-    }
-
-    return (await response.json()) as T;
+  async function initialize(nextEngine: Exclude<EngineKind, null>) {
+    setEngine(nextEngine);
+    setPreviousScreen("engine");
+    setScreen("initializing");
+    await sleep(1500);
+    setScreen("mode");
   }
 
-  async function handleAdd() {
-    setSubmittingAdd(true);
-    setError(null);
-    try {
-      const result = await apiRequest<AddResponse>("/v1/memories/add", {
-        external_user_id: externalUserId,
-        messages: [{ role: "user", content: memoryText }],
-        metadata: { source: "tenant-dashboard-playground" },
-      });
-      setAddResult(result);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to add memory.");
-    } finally {
-      setSubmittingAdd(false);
-    }
+  async function runProcessing(next: Screen, loading: Screen, ms = 1500) {
+    setPreviousScreen(screen);
+    setScreen(loading);
+    await sleep(ms);
+    setScreen(next);
   }
 
-  function handleExternalUserIdChange(value: string) {
-    setExternalUserId(value);
-    if (!retrieveResult || !value || !query || !isLoaded) {
-      return;
-    }
-
-    if (retrieveRefreshTimer.current) {
-      window.clearTimeout(retrieveRefreshTimer.current);
-    }
-    retrieveRefreshTimer.current = window.setTimeout(() => {
-      void handleRetrieve(value);
-    }, 350);
+  function chooseMode(nextMode: Exclude<ModeKind, null>) {
+    if (nextMode === "single") setScreen("single-input");
+    if (nextMode === "conflict") setScreen("conflict-agent-one");
+    if (nextMode === "passport") setScreen("passport-agent");
   }
 
-  async function handleRetrieve(userId = externalUserId) {
-    setSubmittingRetrieve(true);
-    setError(null);
-    try {
-      const result = unwrapRetrieve(
-        await apiRequest<RetrieveResponse>("/v1/memories/retrieve", {
-          external_user_id: userId,
-          query,
-          limit: 5,
-          format,
-          context_max_tokens: CONTEXT_MAX_TOKENS,
-          ...(timeRange !== "all"
-            ? { time_filter_days: Number(timeRange) }
-            : {}),
-        }),
-      );
-      setRetrieveResult(result);
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Unable to retrieve memories.",
-      );
-    } finally {
-      setSubmittingRetrieve(false);
-    }
+  function back() {
+    if (screen === "mode") setScreen("engine");
+    else if (screen === "single-input") setScreen("mode");
+    else if (screen === "single-result") setScreen("mode");
+    else if (screen === "conflict-agent-one") setScreen("mode");
+    else if (screen === "conflict-agent-two") setScreen("conflict-agent-one");
+    else if (screen === "conflict-run") setScreen("conflict-agent-two");
+    else if (screen === "conflict-result") setScreen("mode");
+    else if (screen === "passport-agent") setScreen("mode");
+    else if (screen === "passport-memory") setScreen("passport-agent");
+    else if (screen === "passport-consent") setScreen("passport-memory");
+    else if (screen === "passport-complete") setScreen("passport-memory");
+    else setScreen(previousScreen);
   }
 
-  async function copyPromptAddition() {
-    await navigator.clipboard.writeText(promptAddition);
+  function useExampleConflict() {
+    setAgentOne(defaultAgentOne);
+    setAgentTwo(defaultAgentTwo);
+  }
+
+  async function openConsentPortal() {
+    setScreen("passport-consent");
+    const baseUrl = process.env.NEXT_PUBLIC_CONSENT_BASE_URL;
+    if (baseUrl) {
+      window.open(baseUrl, "_blank", "noopener,noreferrer");
+    }
+    await sleep(4000);
+    setScreen("passport-complete");
+  }
+
+  async function shareResults() {
+    await navigator.clipboard.writeText("MemoryOS Playground complete: extraction, conflict governance, and Memory Passport explored.");
     setCopyLabel("Copied");
-    window.setTimeout(() => setCopyLabel("Copy"), 1400);
+    window.setTimeout(() => setCopyLabel("Share Results"), 1400);
   }
 
-  async function copyClarificationQuestion() {
-    const question = retrieveResult?.clarification_question;
-    if (!question) {
-      return;
-    }
-    await navigator.clipboard.writeText(question);
-    setQuestionCopyLabel("Copied");
-    window.setTimeout(() => setQuestionCopyLabel("Copy question"), 1400);
+  function restart() {
+    setEngine(null);
+    setScreen("engine");
+    setPreviousScreen("engine");
+    setSingleMemory(defaultSingleMemory);
+    setAgentOne(defaultAgentOne);
+    setAgentTwo(defaultAgentTwo);
+    setPassportAgent("Python Coding Assistant");
+  }
+
+  const finalBar = screen.endsWith("result") || screen === "passport-complete";
+
+  if (screen === "engine") {
+    return (
+      <Shell>
+        <StepTitle title="What kind of memory engine do you want to explore?" />
+        <div className="grid w-full max-w-3xl gap-5">
+          <BigOption title="General Engine" subtitle="Works across any agent or use case" onClick={() => void initialize("general")} />
+          <BigOption title="Domain-Specific Engine" subtitle="Optimized for EdTech, Customer Support, or Healthcare" onClick={() => void initialize("domain")} />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "initializing") {
+    return (
+      <Shell onBack={back}>
+        <SegmentedSpinner label="Initializing MemoryOS engine..." />
+      </Shell>
+    );
+  }
+
+  if (screen === "mode") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle title="Choose your memory mode." subtitle={engine === "domain" ? "Domain-specific demos still use the same governance layer underneath." : undefined} />
+        <div className="grid w-full max-w-4xl gap-5">
+          <BigOption title="What does MemoryOS remember?" subtitle="Single-agent memory extraction and scoring" onClick={() => chooseMode("single")} />
+          <BigOption title="Multi-service agent conflict" subtitle="Two agents, one fact, resolved by authority" onClick={() => chooseMode("conflict")} />
+          <BigOption title="User-approved cross-agent memory" subtitle="The Memory Passport: consent, scope, and revocation" onClick={() => chooseMode("passport")} />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "single-input") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle title="What should your agent remember?" subtitle="Write one realistic user message. MemoryOS will extract durable memories from it." />
+        <div className="w-full max-w-4xl space-y-5">
+          <textarea
+            className="min-h-64 w-full rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-2xl leading-9 text-white outline-none ring-violet-500/20 transition focus:ring-4"
+            value={singleMemory}
+            onChange={(event) => setSingleMemory(event.target.value)}
+          />
+          <PrimaryButton onClick={() => void runProcessing("single-result", "single-processing")} disabled={!singleMemory.trim()}>
+            Store Memory
+          </PrimaryButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "single-processing") {
+    return (
+      <Shell onBack={back}>
+        <SegmentedSpinner label="Extracting & scoring..." />
+      </Shell>
+    );
+  }
+
+  if (screen === "single-result") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle eyebrow="Single-agent memory" title="Your agent extracted 3 facts." />
+        <Tabs
+          tabs={[
+            { id: "summary", label: "Summary", content: <p>Your agent now has durable context it can retrieve later instead of asking the user again.</p> },
+            { id: "memories", label: "Extracted Memories", content: <MemoryList items={singleMemories} /> },
+            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={`What you know about this user:\n- User prefers concise technical answers.\n- User mostly works in Python.\n- User is building an AI support product.`} /> },
+            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(\n    external_user_id="user_123",\n    messages=[{"role": "user", "content": "${singleMemory.replaceAll('"', '\\"')}"}],\n)`} /> },
+          ]}
+        />
+        <CompletionBar restart={restart} shareResults={() => void shareResults()} copyLabel={copyLabel} show={finalBar} />
+      </Shell>
+    );
+  }
+
+  if (screen === "conflict-agent-one") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle eyebrow="First agent" title="What does the first agent know?" />
+        <AgentForm agent={agentOne} setAgent={setAgentOne} button="Next" onNext={() => setScreen("conflict-agent-two")} />
+      </Shell>
+    );
+  }
+
+  if (screen === "conflict-agent-two") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle eyebrow="Second agent" title="What does the second agent say?" subtitle="Try something that contradicts Agent 1." />
+        <AgentForm agent={agentTwo} setAgent={setAgentTwo} button="Next" onNext={() => setScreen("conflict-run")} extra={<Button variant="outline" className="h-14 border-zinc-700 bg-black text-lg text-white hover:bg-zinc-900" onClick={useExampleConflict}>Use example conflict</Button>} />
+      </Shell>
+    );
+  }
+
+  if (screen === "conflict-run") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle title="Run MemoryOS" subtitle="MemoryOS will resolve the conflict using source authority." />
+        <div className="grid w-full max-w-4xl gap-5 md:grid-cols-2">
+          <ConflictPreview title={agentOne.name} authority={agentOne.authority} claim={agentOne.claim} />
+          <ConflictPreview title={agentTwo.name} authority={agentTwo.authority} claim={agentTwo.claim} />
+        </div>
+        <div className="mt-10">
+          <PrimaryButton onClick={() => void runProcessing("conflict-result", "conflict-processing")}>Run MemoryOS</PrimaryButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "conflict-processing") {
+    return (
+      <Shell onBack={back}>
+        <SegmentedSpinner label="Resolving conflict..." />
+      </Shell>
+    );
+  }
+
+  if (screen === "conflict-result") {
+    const winner = agentOne.name || "Billing Agent";
+    return (
+      <Shell onBack={back}>
+        <StepTitle eyebrow="Conflict detected" title={`Resolution: ${winner}'s fact is authoritative.`} />
+        <Tabs
+          tabs={[
+            { id: "summary", label: "Summary", content: <p>MemoryOS surfaced both claims and applied the authority rule instead of silently trusting recency.</p> },
+            { id: "memories", label: "Extracted Memories", content: <MemoryList items={[{ text: agentOne.claim, score: "winner", tag: agentOne.authority }, { text: agentTwo.claim, score: "conflict", tag: agentTwo.authority }]} /> },
+            { id: "decision", label: "Conflict Decision", content: <p>{winner} won because it is marked as the source of truth for subscriptions. The losing claim is kept for audit/history, not deleted.</p> },
+            { id: "sources", label: "Sources", content: <CodeBlock code={`run_id: demo-run-001\nagent_1: ${agentOne.name}\nauthority: ${agentOne.authority}\nagent_2: ${agentTwo.name}\nauthority: ${agentTwo.authority}`} /> },
+            { id: "prompt", label: "Prompt Context", content: <CodeBlock code={`Use this subscription context:\n- Current plan: Pro plan, $99/month.\n- Source: ${agentOne.name}.\n- Note: ${agentTwo.name} reported a conflicting downgrade; verify before refunding.`} /> },
+            { id: "code", label: "Integration Code", content: <CodeBlock code={`from memoryos import Memory\n\nmem = Memory(api_key="mem_live_xxx")\n\nmem.add(external_user_id="cust_123", messages=[...], source={"service": "billing"})\nmem.add(external_user_id="cust_123", messages=[...], source={"service": "support"})\n\ncontext = mem.retrieve("cust_123", query="current subscription plan")`} /> },
+          ]}
+        />
+        <CompletionBar restart={restart} shareResults={() => void shareResults()} copyLabel={copyLabel} show={finalBar} />
+      </Shell>
+    );
+  }
+
+  if (screen === "passport-agent") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle title="Name your agent" subtitle="MemoryOS will load a sample Passport profile for this agent." />
+        <div className="w-full max-w-3xl space-y-5">
+          <Input className="h-16 border-zinc-800 bg-zinc-950 px-5 text-2xl text-white" value={passportAgent} onChange={(event) => setPassportAgent(event.target.value)} />
+          <PrimaryButton onClick={() => void runProcessing("passport-memory", "passport-processing")} disabled={!passportAgent.trim()}>Load Memories</PrimaryButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "passport-processing") {
+    return (
+      <Shell onBack={back}>
+        <SegmentedSpinner label="Retrieving agent memory..." />
+      </Shell>
+    );
+  }
+
+  if (screen === "passport-memory") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle eyebrow="Memory Passport" title={`${passportAgent} can request user-approved memory.`} subtitle="Session managed internally by MemoryOS. Agent IDs and keys are not shown in the playground." />
+        <PassportMemory />
+        <div className="mt-8">
+          <PrimaryButton onClick={() => void openConsentPortal()}>
+            <Lock className="mr-3 size-6" />
+            Give Consent
+          </PrimaryButton>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (screen === "passport-consent") {
+    return (
+      <Shell onBack={back}>
+        <StepTitle title="Consent portal opened." subtitle="Return here when done. MemoryOS is checking consent status every 2 seconds." />
+        <div className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-8 text-center">
+          <ExternalLink className="mx-auto size-14 text-violet-400" />
+          <p className="mt-5 text-2xl leading-9 text-zinc-300">Waiting for consent confirmation...</p>
+        </div>
+      </Shell>
+    );
   }
 
   return (
-    <div className="flex flex-col gap-6 pt-14 md:pt-0">
-      <div className="overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-white via-sky-50 to-blue-100 p-6 shadow-sm">
-        <div className="max-w-4xl space-y-3">
-          <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-            Playground
-          </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-            Test real extraction and retrieval
-          </h1>
-          <p className="max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-            Store a memory, track the extraction job, retrieve relevant memories,
-            and inspect the ContextBuilder system prompt addition before wiring
-            it into your app.
-          </p>
-        </div>
+    <Shell onBack={back}>
+      <StepTitle eyebrow="Consent complete" title="Cross-agent access: LIMITED" subtitle="The user approved goals, preferences, and facts. Relationships and expertise remain restricted." />
+      <Tabs
+        tabs={[
+          { id: "approved", label: "Approved", content: <MemoryList items={[{ text: "Goals", score: "granted" }, { text: "Preferences", score: "granted" }, { text: "Facts", score: "granted" }]} /> },
+          { id: "restricted", label: "Restricted", content: <MemoryList items={[{ text: "Relationships", score: "blocked" }, { text: "Expertise", score: "blocked" }]} /> },
+          { id: "revoked", label: "Revocation", content: <p>The user can revoke this grant anytime from the MemoryOS Permission Center.</p> },
+        ]}
+      />
+      <CompletionBar restart={restart} shareResults={() => void shareResults()} copyLabel={copyLabel} show />
+    </Shell>
+  );
+}
+
+function AgentForm({ agent, setAgent, button, onNext, extra }: { agent: typeof defaultAgentOne; setAgent: (agent: typeof defaultAgentOne) => void; button: string; onNext: () => void; extra?: React.ReactNode }) {
+  return (
+    <div className="w-full max-w-4xl space-y-5">
+      <Input className="h-16 border-zinc-800 bg-zinc-950 px-5 text-2xl text-white" value={agent.name} onChange={(event) => setAgent({ ...agent, name: event.target.value })} placeholder="Agent name" />
+      <Input className="h-16 border-zinc-800 bg-zinc-950 px-5 text-2xl text-white" value={agent.authority} onChange={(event) => setAgent({ ...agent, authority: event.target.value })} placeholder="Authority" />
+      <textarea className="min-h-44 w-full rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6 text-2xl leading-9 text-white outline-none ring-violet-500/20 transition focus:ring-4" value={agent.claim} onChange={(event) => setAgent({ ...agent, claim: event.target.value })} placeholder="What does this agent say?" />
+      <div className="flex flex-wrap gap-4">
+        <PrimaryButton onClick={onNext} disabled={!agent.name || !agent.authority || !agent.claim}>{button}</PrimaryButton>
+        {extra}
       </div>
+    </div>
+  );
+}
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">
-          {error}
+function ConflictPreview({ title, authority, claim }: { title: string; authority: string; claim: string }) {
+  return (
+    <div className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6">
+      <h2 className="text-[2rem] font-semibold text-white">{title}</h2>
+      <p className="mt-3 text-xl leading-8 text-violet-300">{authority}</p>
+      <p className="mt-6 text-2xl leading-9 text-zinc-200">{claim}</p>
+    </div>
+  );
+}
+
+function PassportMemory() {
+  const sections = [
+    ["Goals", "Ship MemoryOS without losing governance quality."],
+    ["Preferences", "Prefers direct technical explanations."],
+    ["Facts", "Works mostly with Python and TypeScript."],
+    ["History", "Previously connected a study assistant."],
+  ];
+  return (
+    <div className="grid w-full max-w-4xl gap-4 md:grid-cols-2">
+      {sections.map(([title, value]) => (
+        <div key={title} className="rounded-[2rem] border border-zinc-800 bg-zinc-950 p-6">
+          <p className="text-lg font-semibold uppercase tracking-[0.2em] text-violet-400">{title}</p>
+          <p className="mt-4 text-2xl leading-9 text-white">{value}</p>
         </div>
-      ) : null}
+      ))}
+    </div>
+  );
+}
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <div className="space-y-6">
-          <Card className="overflow-hidden border-sky-100 shadow-sm">
-            <CardHeader className="border-b border-sky-100 bg-sky-50/70">
-              <CardTitle className="flex items-center gap-2">
-                <span className="flex size-8 items-center justify-center rounded-xl bg-sky-700 text-white">
-                  <Send className="size-4" />
-                </span>
-                Store a memory
-              </CardTitle>
-              <CardDescription className="text-slate-600">
-                Queues a real extraction job through /v1/memories/add.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">
-                  External user ID
-                </label>
-                <Input
-                  value={externalUserId}
-                  onChange={(event) =>
-                    handleExternalUserIdChange(event.target.value)
-                  }
-                  placeholder="user_123"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">
-                  Message to remember
-                </label>
-                <textarea
-                  className="min-h-36 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring-4"
-                  value={memoryText}
-                  onChange={(event) => setMemoryText(event.target.value)}
-                />
-              </div>
-              <Button
-                className={`w-full ${primaryButtonClassName}`}
-                onClick={() => void handleAdd()}
-                disabled={!isLoaded || submittingAdd || !externalUserId || !memoryText}
-              >
-                {submittingAdd ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 size-4" />
-                )}
-                Store Memory
-              </Button>
-            </CardContent>
-          </Card>
-
-          <JobTracker jobId={addResult?.job_id ?? null} getToken={getToken} />
-          <AddResultExplainer result={addResult} />
-        </div>
-
-        <Card className="overflow-hidden border-sky-100 shadow-sm">
-          <CardHeader className="border-b border-sky-100 bg-sky-50/70">
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-xl bg-sky-700 text-white">
-                <Sparkles className="size-4" />
-              </span>
-              Retrieve context
-            </CardTitle>
-            <CardDescription className="text-slate-600">
-              Calls /v1/memories/retrieve with ContextBuilder options.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">
-                External user ID
-              </label>
-              <Input
-                value={externalUserId}
-                onChange={(event) =>
-                  handleExternalUserIdChange(event.target.value)
-                }
-                placeholder="user_123"
-              />
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">
-                  Time range
-                </label>
-                <Select
-                  value={timeRange}
-                  onValueChange={(value) => setTimeRange(value as TimeRangeValue)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="All time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIME_RANGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">
-                  Context format
-                </label>
-                <div className="flex rounded-2xl border border-slate-200 p-1">
-                  {(["bullets", "json", "xml"] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold capitalize transition ${
-                        format === option
-                          ? "bg-sky-600 text-white"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                      onClick={() => setFormat(option)}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">
-                Query
-              </label>
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="What does this user prefer?"
-              />
-            </div>
-
-            <Button
-              className={`w-full ${primaryButtonClassName}`}
-              onClick={() => void handleRetrieve()}
-              disabled={!isLoaded || submittingRetrieve || !externalUserId || !query}
-            >
-              {submittingRetrieve ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 size-4" />
-              )}
-              Retrieve Memories
-            </Button>
-
-            {(retrieveResult?.data ?? []).length ? (
-              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Retrieved memories
-                </div>
-                {retrieveResult?.data?.map((memory) => (
-                  <div
-                    key={memory.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <Badge variant="outline" className="border-sky-200 bg-sky-50 text-sky-800">
-                        {memory.category}
-                      </Badge>
-                      <span className="text-xs text-slate-500">
-                        importance {memory.importance_score.toFixed(1)}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">
-                      {memory.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <section className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-950">
-                    System Prompt Addition
-                  </h2>
-                  <p className="text-xs text-slate-500">
-                    Paste this before your system prompt:
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void copyPromptAddition()}
-                  disabled={!promptAddition}
-                >
-                  <Copy className="mr-2 size-4" />
-                  {copyLabel}
-                </Button>
-              </div>
-              {promptAddition ? (
-                <>
-                  <pre className="max-h-80 overflow-auto rounded-2xl bg-slate-950 p-4 text-sm leading-6 text-slate-100 shadow-inner">
-                    {promptAddition}
-                  </pre>
-                  <p className="text-xs text-slate-500">
-                    {retrieveResult?.context_token_count ?? 0} /{" "}
-                    {CONTEXT_MAX_TOKENS} tokens used
-                  </p>
-                </>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/50 p-5 text-sm text-slate-500">
-                  No memories retrieved - system prompt addition is empty
-                </div>
-              )}
-            </section>
-
-            {retrieveResult?.clarification_question ? (
-              <section className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                      <MessageCircle className="size-5" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-sm font-semibold">
-                        Suggested clarification for this user:
-                      </div>
-                      <p className="text-base font-medium italic leading-7">
-                        {retrieveResult.clarification_question}
-                      </p>
-                      <p className="text-sm text-amber-900/75">
-                        Include this naturally in your AI&apos;s next response
-                        to resolve a memory conflict for this user.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 border-amber-200 bg-white"
-                    onClick={() => void copyClarificationQuestion()}
-                  >
-                    <Copy className="mr-2 size-4" />
-                    {questionCopyLabel}
-                  </Button>
-                </div>
-                <p className="border-t border-amber-200 pt-3 text-xs text-amber-900/70">
-                  This question will disappear after the user&apos;s next
-                  session - MemoryOS tracks whether it was addressed.
-                </p>
-              </section>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+function CompletionBar({ restart, shareResults, copyLabel, show }: { restart: () => void; shareResults: () => void; copyLabel: string; show: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 flex-wrap items-center gap-4 rounded-full border border-zinc-800 bg-zinc-950/95 px-5 py-4 shadow-2xl shadow-black">
+      <span className="text-xl font-semibold text-white">MemoryOS Playground complete.</span>
+      <Button type="button" variant="outline" className="rounded-full border-zinc-700 bg-black text-white hover:bg-zinc-900" onClick={restart}>
+        <RotateCcw className="mr-2 size-4" /> Restart Demo
+      </Button>
+      <Button type="button" className="rounded-full text-white" style={{ backgroundColor: VIOLET }} onClick={shareResults}>
+        <Copy className="mr-2 size-4" /> {copyLabel}
+      </Button>
     </div>
   );
 }
