@@ -82,14 +82,14 @@ function SidebarNav() {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              "flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
               active
                 ? "bg-sky-700 text-white shadow-sm"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-950",
             )}
           >
-            <Icon className="size-4" />
-            <span>{item.label}</span>
+            <Icon className="size-4 shrink-0" />
+            <span className="truncate">{item.label}</span>
             {item.href === "/conflicts" && requiresAttention > 0 ? (
               <span
                 aria-label={`${requiresAttention} conflicts need attention`}
@@ -105,10 +105,10 @@ function SidebarNav() {
         href={docsHref}
         target="_blank"
         rel="noreferrer"
-        className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
+        className="flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950"
       >
-        <BookOpen className="size-4" />
-        <span>Docs</span>
+        <BookOpen className="size-4 shrink-0" />
+        <span className="truncate">Docs</span>
         <ExternalLink className="ml-auto size-3.5 text-slate-400" />
       </a>
     </nav>
@@ -117,21 +117,23 @@ function SidebarNav() {
 
 function SidebarRail() {
   return (
-    <div className="flex h-full flex-col border-r border-slate-200 bg-white">
+    <div className="flex h-full w-64 min-w-0 max-w-64 flex-col overflow-hidden border-r border-slate-200 bg-white">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
         <div className="flex size-9 items-center justify-center rounded-xl bg-slate-950 text-sm font-semibold text-white">
           M
         </div>
-        <div>
-          <div className="text-sm font-semibold text-slate-950">MemoryOS</div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-950">MemoryOS</div>
           <div className="text-xs text-slate-500">Tenant Dashboard</div>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between px-4 py-5">
-        <SidebarNav />
+      <div className="flex min-h-0 flex-1 flex-col px-4 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <SidebarNav />
+        </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+        <div className="mt-4 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-3">
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
               Workspace
@@ -143,11 +145,11 @@ function SidebarRail() {
               appearance={{
                 elements: {
                   organizationSwitcherTrigger:
-                    "w-full justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50",
+                    "w-full max-w-full min-w-0 justify-between overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50",
                   organizationPreviewMainIdentifier:
-                    "text-sm font-medium text-slate-900",
+                    "max-w-[150px] truncate text-sm font-medium text-slate-900",
                   organizationPreviewSecondaryIdentifier:
-                    "text-xs text-slate-500",
+                    "max-w-[150px] truncate text-xs text-slate-500",
                 },
               }}
             />
@@ -157,12 +159,12 @@ function SidebarRail() {
             <Activity className="size-3.5" />
             Session
           </div>
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-slate-900">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-slate-900">
                 Signed in
               </div>
-              <div className="text-xs text-slate-500">
+              <div className="truncate text-xs text-slate-500">
                 Tenant access active
               </div>
             </div>
@@ -194,14 +196,14 @@ export function Sidebar() {
               </DialogTrigger>
               <DialogContent
                 showCloseButton={false}
-                className="left-0 top-0 h-screen w-[240px] max-w-[240px] translate-x-0 translate-y-0 rounded-none border-r border-slate-200 p-0"
+                className="left-0 top-0 h-screen w-64 max-w-64 translate-x-0 translate-y-0 rounded-none border-r border-slate-200 p-0"
               >
                 <DialogTitle className="sr-only">Navigation</DialogTitle>
                 <SidebarRail />
               </DialogContent>
             </Dialog>
-            <div>
-              <div className="text-sm font-semibold text-slate-950">MemoryOS</div>
+            <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-950">MemoryOS</div>
               <div className="text-xs text-slate-500">Tenant Dashboard</div>
             </div>
           </div>
@@ -215,7 +217,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      <aside className="hidden h-screen w-60 shrink-0 md:sticky md:top-0 md:flex">
+      <aside className="hidden h-screen w-64 min-w-64 max-w-64 shrink-0 overflow-hidden md:sticky md:top-0 md:flex">
         <SidebarRail />
       </aside>
     </>
