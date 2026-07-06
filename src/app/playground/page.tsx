@@ -28,11 +28,11 @@ function stored(job: MemoryJobStatus) { return job.memories_created ?? job.memor
 
 function Shell({ children, onBack }: { children: React.ReactNode; onBack?: () => void }) {
   return (
-    <main className="relative -m-6 min-h-[calc(100vh-2rem)] overflow-hidden bg-black px-5 py-8 text-white md:-m-8 md:px-10">
+    <main className="relative -m-6 min-h-[calc(100vh-2rem)] overflow-y-auto bg-black px-5 py-8 text-white md:-m-8 md:px-10">
       <div className="pointer-events-none absolute inset-0 opacity-50 [background:radial-gradient(circle_at_20%_15%,rgba(124,58,237,0.28),transparent_34%),radial-gradient(circle_at_85%_20%,rgba(14,165,233,0.14),transparent_30%),linear-gradient(180deg,#000,#050505)]" />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px] opacity-20" />
-      {onBack ? <button onClick={onBack} className="absolute left-6 top-6 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:border-violet-400"><ArrowLeft className="size-4" /> Back</button> : null}
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col items-center justify-center">{children}</div>
+      {onBack ? <button onClick={onBack} className="fixed left-6 top-6 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:border-violet-400"><ArrowLeft className="size-4" /> Back</button> : null}
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center pt-16 pb-28">{children}</div>
     </main>
   );
 }
