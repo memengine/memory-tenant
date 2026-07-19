@@ -316,8 +316,8 @@ export default function ConflictsPage() {
                 <ConflictUserSessionCard key={conflict.id} conflict={conflict} />
               ))}
               <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
-                No action needed. MemoryOS handles these automatically. You will
-                see them move to Resolved once the user responds.
+                No tenant action needed. MemoryOS is waiting for the user to
+                confirm the personal truth, then this will move to Resolved.
               </div>
             </section>
           ) : null}
