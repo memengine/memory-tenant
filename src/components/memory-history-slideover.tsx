@@ -8,8 +8,7 @@ import {
   type MemoryVersionEntry,
 } from "@/components/version-timeline";
 import { Button } from "@/components/ui/button";
-
-type TokenGetter = () => Promise<string | null>;
+import { getDashboardToken, type TokenGetter } from "@/lib/api";
 
 type HistoryResponse =
   | { data?: MemoryVersionEntry[] }
@@ -68,7 +67,7 @@ export function MemoryHistorySlideover({
       setLoading(true);
       setError(null);
       try {
-        const token = await getToken();
+        const token = await getDashboardToken(getToken);
         const response = await fetch(
           `${API_BASE}/v1/memories/${encodeURIComponent(targetMemoryId)}/history`,
           {

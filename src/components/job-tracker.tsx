@@ -6,8 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-type TokenGetter = () => Promise<string | null>;
+import { getDashboardToken, type TokenGetter } from "@/lib/api";
 
 type JobStatus = "queued" | "processing" | "complete" | "dead" | "unknown";
 
@@ -108,7 +107,7 @@ export function JobTracker({
     }
     setLoading(true);
     try {
-      const token = await getToken();
+      const token = await getDashboardToken(getToken);
       const response = await fetch(
         `${API_BASE}/v1/memories/jobs/${encodeURIComponent(jobId)}`,
         {
