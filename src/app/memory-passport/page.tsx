@@ -4,15 +4,12 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import {
-  ArrowRight,
   CheckCircle2,
   Copy,
-  ExternalLink,
   Fingerprint,
   Info,
   Link2,
   Plus,
-  ShieldAlert,
 } from "lucide-react";
 
 import { RevealKeyDialog } from "@/components/reveal-key-dialog";
@@ -31,52 +28,21 @@ import {
 } from "@/lib/api";
 
 const ALL_CATEGORIES: Array<{ value: MemoryCategory; label: string; description: string }> = [
-  {
-    value: "preference",
-    label: "Preferences",
-    description: "Communication style, settings, and defaults.",
-  },
-  {
-    value: "fact",
-    label: "Facts",
-    description: "Stable profile facts that help personalization.",
-  },
-  {
-    value: "goal",
-    label: "Goals",
-    description: "Plans and outcomes the user is working toward.",
-  },
-  {
-    value: "procedure",
-    label: "Procedures",
-    description: "How the user prefers to complete recurring work.",
-  },
-  {
-    value: "relationship",
-    label: "Relationships",
-    description: "Teams, collaborators, and shared context.",
-  },
-  {
-    value: "expertise",
-    label: "Expertise",
-    description: "Skills, tools, and domains the user knows.",
-  },
+  { value: "preference", label: "Preferences", description: "Communication style, settings, and defaults." },
+  { value: "fact", label: "Facts", description: "Stable profile facts that help personalization." },
+  { value: "goal", label: "Goals", description: "Plans and outcomes the user is working toward." },
+  { value: "procedure", label: "Procedures", description: "How the user prefers to complete recurring work." },
+  { value: "relationship", label: "Relationships", description: "Teams, collaborators, and shared context." },
+  { value: "expertise", label: "Expertise", description: "Skills, tools, and domains the user knows." },
 ];
 
 const CONSENT_BASE = process.env.NEXT_PUBLIC_CONSENT_BASE_URL?.replace(/\/$/, "") || "";
 
 function formatDate(value: string | null) {
-  if (!value) {
-    return "Unknown";
-  }
+  if (!value) return "Unknown";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function copyText(value: string) {
@@ -89,30 +55,17 @@ function buildConsentUrl(options: {
   state: string;
   redirectUri: string;
 }) {
-  if (!CONSENT_BASE) {
-    return "";
-  }
+  if (!CONSENT_BASE) return "";
   const params = new URLSearchParams({ agent_id: options.agentId });
-  if (options.categories.length > 0) {
-    params.set("categories", options.categories.join(","));
-  }
-  if (options.state.trim()) {
-    params.set("state", options.state.trim());
-  }
-  if (options.redirectUri.trim()) {
-    params.set("redirect_uri", options.redirectUri.trim());
-  }
+  if (options.categories.length > 0) params.set("categories", options.categories.join(","));
+  if (options.state.trim()) params.set("state", options.state.trim());
+  if (options.redirectUri.trim()) params.set("redirect_uri", options.redirectUri.trim());
   return `${CONSENT_BASE}/consent?${params.toString()}`;
 }
 
 function buildConnectUrl(options: { agentId: string; linkToken: string }) {
-  if (!CONSENT_BASE) {
-    return "";
-  }
-  const params = new URLSearchParams({
-    agent_id: options.agentId,
-    link_token: options.linkToken,
-  });
+  if (!CONSENT_BASE) return "";
+  const params = new URLSearchParams({ agent_id: options.agentId, link_token: options.linkToken });
   return `${CONSENT_BASE}/connect?${params.toString()}`;
 }
 
@@ -124,11 +77,7 @@ function CategoryPicker({
   onChange: (next: MemoryCategory[]) => void;
 }) {
   function toggle(category: MemoryCategory) {
-    onChange(
-      selected.includes(category)
-        ? selected.filter((item) => item !== category)
-        : [...selected, category],
-    );
+    onChange(selected.includes(category) ? selected.filter((item) => item !== category) : [...selected, category]);
   }
 
   return (
@@ -141,7 +90,7 @@ function CategoryPicker({
             type="button"
             onClick={() => toggle(category.value)}
             className={[
-              "min-h-28 rounded-2xl border p-4 text-left transition",
+              "min-h-24 rounded-2xl border p-4 text-left transition",
               checked
                 ? "border-sky-300 bg-sky-50 text-sky-950"
                 : "border-slate-200 bg-white text-slate-700 hover:border-slate-300",
@@ -152,17 +101,13 @@ function CategoryPicker({
               <span
                 className={[
                   "flex size-5 items-center justify-center rounded-full border text-xs",
-                  checked
-                    ? "border-sky-500 bg-sky-600 text-white"
-                    : "border-slate-300 text-transparent",
+                  checked ? "border-sky-500 bg-sky-600 text-white" : "border-slate-300 text-transparent",
                 ].join(" ")}
               >
                 {checked ? <CheckCircle2 className="size-3.5" /> : null}
               </span>
             </span>
-            <span className="mt-2 block text-sm leading-6 text-slate-500">
-              {category.description}
-            </span>
+            <span className="mt-2 block text-sm leading-6 text-slate-500">{category.description}</span>
           </button>
         );
       })}
@@ -172,37 +117,9 @@ function CategoryPicker({
 
 function AgentStatusBadge({ agent }: { agent: GlobalAgentData }) {
   if (agent.is_verified) {
-    return (
-      <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-        Verified
-      </Badge>
-    );
+    return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Verified</Badge>;
   }
-  return (
-    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-      Pending MemoryOS review
-    </Badge>
-  );
-}
-
-function PassportStep({
-  step,
-  title,
-  description,
-}: {
-  step: string;
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
-        {step}
-      </div>
-      <div className="mt-2 font-semibold text-slate-950">{title}</div>
-      <p className="mt-1 text-sm leading-6 text-slate-600">{description}</p>
-    </div>
-  );
+  return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pending MemoryOS review</Badge>;
 }
 
 export default function MemoryPassportPage() {
@@ -211,16 +128,9 @@ export default function MemoryPassportPage() {
   const [description, setDescription] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
-  const [defaultCategories, setDefaultCategories] = useState<MemoryCategory[]>([
-    "preference",
-    "fact",
-    "goal",
-  ]);
+  const [defaultCategories, setDefaultCategories] = useState<MemoryCategory[]>(["preference", "fact", "goal"]);
   const [selectedAgentId, setSelectedAgentId] = useState("");
-  const [urlCategories, setUrlCategories] = useState<MemoryCategory[]>([
-    "preference",
-    "goal",
-  ]);
+  const [urlCategories, setUrlCategories] = useState<MemoryCategory[]>(["preference", "goal"]);
   const [stateValue, setStateValue] = useState("user_session_id");
   const [redirectUri, setRedirectUri] = useState("");
   const [externalUserId, setExternalUserId] = useState("");
@@ -232,12 +142,11 @@ export default function MemoryPassportPage() {
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [shareMode, setShareMode] = useState<"consent" | "connector">("consent");
 
-  const agentsQuery = useSWR(
-    isLoaded ? "tenant-global-agents" : null,
-    () => listGlobalAgents(getToken),
-    { refreshInterval: 30_000 },
-  );
+  const agentsQuery = useSWR(isLoaded ? "tenant-global-agents" : null, () => listGlobalAgents(getToken), {
+    refreshInterval: 30_000,
+  });
 
   const agents = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
   const selectedAgent = useMemo(
@@ -246,17 +155,11 @@ export default function MemoryPassportPage() {
   );
 
   const consentUrl = selectedAgent
-    ? buildConsentUrl({
-        agentId: selectedAgent.id,
-        categories: urlCategories,
-        state: stateValue,
-        redirectUri,
-      })
+    ? buildConsentUrl({ agentId: selectedAgent.id, categories: urlCategories, state: stateValue, redirectUri })
     : "";
-  const connectUrl =
-    selectedAgent && linkTokenData
-      ? buildConnectUrl({ agentId: selectedAgent.id, linkToken: linkTokenData.link_token })
-      : "";
+  const connectUrl = selectedAgent && linkTokenData ? buildConnectUrl({ agentId: selectedAgent.id, linkToken: linkTokenData.link_token }) : "";
+  const verifiedCount = agents.filter((agent) => agent.is_verified).length;
+  const reviewCount = agents.length - verifiedCount;
 
   async function handleCreateAgent() {
     if (!name.trim()) {
@@ -321,133 +224,49 @@ export default function MemoryPassportPage() {
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
-      <div className="space-y-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-          Memory Passport
-        </span>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-          User-approved memory for your AI agents
-        </h1>
-        <p className="max-w-3xl text-sm text-slate-600 sm:text-base">
-          Create a public agent identity, share a permission link, and let users choose which
-          Memory Passport categories your agent can read. Nothing is shared until the user
-          approves it on the consent screen.
-        </p>
-      </div>
-
-      <section className="grid gap-3 lg:grid-cols-[1fr_auto_1fr_auto_1fr]">
-        <PassportStep
-          step="Step 1"
-          title="Create an agent identity"
-          description="This is the public profile users see before approving access. The secret key stays in your backend."
-        />
-        <div className="hidden items-center text-slate-300 lg:flex">
-          <ArrowRight className="size-5" />
+      <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white shadow-sm">
+        <div className="grid gap-8 p-6 lg:grid-cols-[1fr_420px] lg:p-8">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-300">Memory Passport</span>
+            <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+              Let users approve what your AI agents can remember.
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+              Create one public agent identity, put a connect button in your product, and send users to MemoryOS to approve categories, expiry, and revocation. Nothing is shared until the user says yes.
+            </p>
+          </div>
+          <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="text-sm font-semibold text-white">Setup path</div>
+            <div className="mt-4 space-y-3 text-sm text-slate-300">
+              {["Create a Passport agent profile users can recognize.", "Choose a consent URL or secure-link connector flow.", "User approves access in the MemoryOS consent center."].map((item, index) => (
+                <div key={item} className="flex items-start gap-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400 text-xs font-bold text-slate-950">{index + 1}</span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <PassportStep
-          step="Step 2"
-          title="Share a consent link"
-          description="Use the generated URL behind a button like Connect shared memory in your product."
-        />
-        <div className="hidden items-center text-slate-300 lg:flex">
-          <ArrowRight className="size-5" />
-        </div>
-        <PassportStep
-          step="Step 3"
-          title="User stays in control"
-          description="The user can edit categories, choose an expiry, revoke access, and resolve personal memory conflicts."
-        />
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card className="border-sky-100 bg-sky-50/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="size-4 text-sky-700" />
-              Consent URL
-            </CardTitle>
-            <CardDescription>
-              Use this when your AI agent wants permission to read a user's Memory Passport.
-              Add it to a user-facing button such as Connect shared memory.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card className="border-emerald-100 bg-emerald-50/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Fingerprint className="size-4 text-emerald-700" />
-              Secure-link connector
-            </CardTitle>
-            <CardDescription>
-              Use this fallback when your app does not have OAuth/OIDC yet. After a signed-in
-              user clicks Connect Memory Passport, your backend creates a one-time link.
-            </CardDescription>
-          </CardHeader>
-        </Card>
       </section>
 
       {message ? (
-        <Card className="border border-slate-200 bg-slate-50">
+        <Card className="border border-slate-200 bg-white">
           <CardContent className="py-4 text-sm text-slate-700">{message}</CardContent>
         </Card>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader>
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-slate-100 bg-white">
             <CardTitle className="flex items-center gap-2">
-              <Fingerprint className="size-5 text-sky-700" />
-              Agent identities
-            </CardTitle>
-            <CardDescription>Profiles users see on the Memory Passport consent page.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-slate-950">{agents.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="size-5 text-emerald-700" />
-              Verified
-            </CardTitle>
-            <CardDescription>Reviewed identities that show a MemoryOS verification badge.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-slate-950">
-              {agents.filter((agent) => agent.is_verified).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldAlert className="size-5 text-amber-700" />
-              Needs review
-            </CardTitle>
-            <CardDescription>Created agents waiting for MemoryOS operator review.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-semibold text-slate-950">
-              {agents.filter((agent) => !agent.is_verified).length}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="size-5" />
+              <Plus className="size-5 text-sky-700" />
               Create Passport agent
             </CardTitle>
             <CardDescription>
-              This creates the app identity shown to users during consent. The private key is
-              shown once and should be stored only in your backend secret manager.
+              This is the public identity shown on the consent screen. The private key is shown once after creation and should stay in your backend secret manager.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-5 p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700">Agent name</span>
@@ -469,11 +288,8 @@ export default function MemoryPassportPage() {
 
             <div className="space-y-3">
               <div>
-                <div className="text-sm font-medium text-slate-800">Default requested categories</div>
-                <p className="text-sm text-slate-500">
-                  Pick the categories your agent usually needs. These are defaults only - users
-                  can remove categories before approving access.
-                </p>
+                <div className="text-sm font-medium text-slate-800">Default categories</div>
+                <p className="text-sm text-slate-500">These are only defaults. Users can remove categories before approving access.</p>
               </div>
               <CategoryPicker selected={defaultCategories} onChange={setDefaultCategories} />
             </div>
@@ -484,284 +300,207 @@ export default function MemoryPassportPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Share Memory Passport access</CardTitle>
-            <CardDescription>
-              Generate the link your product opens when a user clicks &quot;Connect shared
-              memory&quot;. The link starts a permission flow; it does not grant access by itself.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {agents.length > 0 ? (
-              <>
-                {!CONSENT_BASE ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                    Consent links are not configured for this dashboard environment yet. Set
-                    the consent app URL before sharing links with users.
-                  </div>
-                ) : null}
+        <aside className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Workspace status</CardTitle>
+              <CardDescription>Passport identities registered by this workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-2xl font-semibold text-slate-950">{agents.length}</div>
+                <div className="mt-1 text-xs text-slate-500">Agents</div>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+                <div className="text-2xl font-semibold text-emerald-900">{verifiedCount}</div>
+                <div className="mt-1 text-xs text-emerald-700">Verified</div>
+              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <div className="text-2xl font-semibold text-amber-900">{reviewCount}</div>
+                <div className="mt-1 text-xs text-amber-700">Review</div>
+              </div>
+            </CardContent>
+          </Card>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-700">Agent</span>
-                  <select
-                    value={selectedAgent?.id ?? ""}
-                    onChange={(event) => setSelectedAgentId(event.target.value)}
-                    className="min-h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800"
-                  >
-                    {agents.map((agent) => (
-                      <option key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+          <Card className="border-sky-100 bg-sky-50/70">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Info className="size-4 text-sky-700" />
+                Which link should I use?
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm leading-6 text-slate-700">
+              <p><strong>Consent URL:</strong> reusable permission link for your AI agent.</p>
+              <p><strong>Secure-link connector:</strong> single-use link for one signed-in app user when you need account binding.</p>
+            </CardContent>
+          </Card>
+        </aside>
+      </section>
 
-                {selectedAgent ? (
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium text-slate-950">{selectedAgent.name}</div>
-                        <div className="mt-1 font-mono text-xs text-slate-500">{selectedAgent.id}</div>
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-slate-100 bg-white">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle>Share access with users</CardTitle>
+              <CardDescription>
+                Select an agent, choose the sharing method, then place the generated link behind your product button.
+              </CardDescription>
+            </div>
+            <div className="grid rounded-2xl border border-slate-200 bg-slate-50 p-1 sm:grid-cols-2">
+              <button type="button" onClick={() => setShareMode("consent")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "consent" ? "bg-white text-sky-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Consent URL</button>
+              <button type="button" onClick={() => setShareMode("connector")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "connector" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Secure-link connector</button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5 p-5">
+          {agents.length > 0 ? (
+            <>
+              {!CONSENT_BASE ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Consent app URL is not configured for this dashboard environment yet. Set NEXT_PUBLIC_CONSENT_BASE_URL before sharing links with users.
+                </div>
+              ) : null}
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium text-slate-700">Agent</span>
+                <select value={selectedAgent?.id ?? ""} onChange={(event) => setSelectedAgentId(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800">
+                  {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+                </select>
+              </label>
+
+              {selectedAgent ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-950">{selectedAgent.name}</span>
+                        <AgentStatusBadge agent={selectedAgent} />
                       </div>
-                      <AgentStatusBadge agent={selectedAgent} />
+                      <div className="mt-1 font-mono text-xs text-slate-500">{selectedAgent.id}</div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => void copyText(selectedAgent.id)}>
-                        <Copy className="mr-2 size-4" />
-                        Copy agent ID
-                      </Button>
-                      {selectedAgent.website_url ? (
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={selectedAgent.website_url} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-2 size-4" />
-                            Website
-                          </a>
-                        </Button>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 flex gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600">
-                      <Info className="mt-0.5 size-4 shrink-0 text-sky-700" />
-                      <span>
-                        Agent ID is for your backend configuration. Users should receive the
-                        consent URL, not the private agent key.
-                      </span>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => void copyText(selectedAgent.id)}><Copy className="mr-2 size-4" />Copy agent ID</Button>
                   </div>
-                ) : null}
+                </div>
+              ) : null}
 
-                <div className="space-y-3">
-                  <div>
-                    <div className="text-sm font-medium text-slate-800">Preselected categories</div>
-                    <p className="text-sm text-slate-500">
-                      These categories are preselected for convenience. The user can change
-                      them before approving access.
-                    </p>
+              {shareMode === "consent" ? (
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
+                    Use this for the normal Memory Passport flow. Your app opens this URL when a user clicks <strong>Connect shared memory</strong>. The user reviews the agent and approves categories before anything is shared.
                   </div>
-                  <CategoryPicker selected={urlCategories} onChange={setUrlCategories} />
-                </div>
 
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-700">State</span>
-                  <Input value={stateValue} onChange={(event) => setStateValue(event.target.value)} placeholder="secure_random_state" />
-                  <span className="block text-xs leading-5 text-slate-500">
-                    Optional value returned to your app after consent. Use your own session or
-                    request ID so you can match the result.
-                  </span>
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-slate-700">Return URL optional</span>
-                  <Input value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} placeholder="https://yourapp.com/integrations/memoryos/callback" />
-                  <span className="block text-xs leading-5 text-slate-500">
-                    Send the user back to your app after approval. If blank, MemoryOS shows a
-                    clear success screen.
-                  </span>
-                </label>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-sm font-medium text-slate-800">Preselected categories</div>
+                      <p className="text-sm text-slate-500">Users can add or remove categories on the consent screen.</p>
+                    </div>
+                    <CategoryPicker selected={urlCategories} onChange={setUrlCategories} />
+                  </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">
-                  {consentUrl || "Consent URL is not configured for this environment."}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-700">State</span>
+                      <Input value={stateValue} onChange={(event) => setStateValue(event.target.value)} placeholder="secure_random_state" />
+                      <span className="block text-xs leading-5 text-slate-500">Returned to your app so you can match the consent result.</span>
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-700">Return URL optional</span>
+                      <Input value={redirectUri} onChange={(event) => setRedirectUri(event.target.value)} placeholder="https://yourapp.com/integrations/memoryos/callback" />
+                      <span className="block text-xs leading-5 text-slate-500">Leave blank to show the MemoryOS success screen.</span>
+                    </label>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">{consentUrl || "Consent URL is not configured for this environment."}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => void copyText(consentUrl)} disabled={!consentUrl}><Copy className="mr-2 size-4" />Copy consent URL</Button>
+                    {consentUrl ? <Button variant="outline" asChild><a href={consentUrl} target="_blank" rel="noreferrer"><Link2 className="mr-2 size-4" />Preview</a></Button> : null}
+                  </div>
                 </div>
-                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">
-                  Put this URL behind your product button. The user reviews your agent, chooses
-                  categories, and can revoke access later from their Memory Passport.
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => void copyText(consentUrl)} disabled={!consentUrl}>
-                    <Copy className="mr-2 size-4" />
-                    Copy consent URL
+              ) : (
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+                    Use this when your app does not have OAuth yet. Your backend creates this single-use link after the customer is signed in, then redirects them to MemoryOS to approve the connector.
+                  </div>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">User ID in your app</span>
+                    <Input
+                      value={externalUserId}
+                      onChange={(event) => {
+                        setExternalUserId(event.target.value);
+                        setLinkTokenData(null);
+                        setLinkMessage(null);
+                        setLinkError(null);
+                      }}
+                      placeholder="cust_8a72 or user_123"
+                    />
+                    <span className="block text-xs leading-5 text-slate-500">This is only for manual testing here. In production your backend passes the signed-in user ID automatically.</span>
+                  </label>
+
+                  <Button variant="outline" onClick={() => void handleCreateLinkToken()} disabled={linkBusy || !selectedAgent || !externalUserId.trim()}>
+                    {linkBusy ? "Creating connector link..." : "Create connector link"}
                   </Button>
-                  {consentUrl ? (
-                    <Button variant="outline" asChild>
-                      <a href={consentUrl} target="_blank" rel="noreferrer">
-                        <Link2 className="mr-2 size-4" />
-                        Preview
-                      </a>
-                    </Button>
+
+                  {linkError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800">{linkError}</div> : null}
+                  {linkMessage ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">{linkMessage}</div> : null}
+
+                  {linkTokenData ? (
+                    <>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">{connectUrl || "Connect URL is not configured for this environment."}</div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => void copyText(connectUrl)} disabled={!connectUrl}><Copy className="mr-2 size-4" />Copy connector link</Button>
+                        {connectUrl ? <Button variant="outline" asChild><a href={connectUrl} target="_blank" rel="noreferrer"><Link2 className="mr-2 size-4" />Test link</a></Button> : null}
+                      </div>
+                      <p className="text-xs leading-5 text-slate-500">Expires in {Math.round(linkTokenData.expires_in_seconds / 60)} minutes. Create a fresh link each time the user starts the connection flow.</p>
+                    </>
                   ) : null}
                 </div>
-
-                <div className="border-t border-slate-200 pt-5">
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-slate-950">Secure-link connector</h3>
-                    <p className="text-sm leading-6 text-slate-600">
-                      This is the no-OAuth connector path. In your app, a signed-in customer
-                      clicks Connect Memory Passport, your backend creates a one-time link, and
-                      the user reviews access on MemoryOS.
-                    </p>
-                  </div>
-
-                  <div className="mt-4 space-y-4">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                      This dashboard generator is for manually checking one user flow. In
-                      production, your backend calls the same API automatically for the
-                      signed-in user and redirects them to the generated connector link.
-                    </div>
-
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium text-slate-700">User ID in your app</span>
-                      <Input
-                        value={externalUserId}
-                        onChange={(event) => {
-                          setExternalUserId(event.target.value);
-                          setLinkTokenData(null);
-                          setLinkMessage(null);
-                          setLinkError(null);
-                        }}
-                        placeholder="cust_8a72 or user_123"
-                      />
-                      <span className="block text-xs leading-5 text-slate-500">
-                        For real users, pass this value from your authenticated app session
-                        when the user clicks Connect Memory Passport.
-                      </span>
-                    </label>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => void handleCreateLinkToken()}
-                      disabled={linkBusy || !selectedAgent || !externalUserId.trim()}
-                    >
-                      {linkBusy ? "Creating connector link..." : "Create connector link"}
-                    </Button>
-
-                    {linkError ? (
-                      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-800">
-                        {linkError}
-                      </div>
-                    ) : null}
-
-                    {linkMessage ? (
-                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
-                        {linkMessage}
-                      </div>
-                    ) : null}
-
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
-                      In production, generate this link server-side only after the user is
-                      signed in to your app. Tell the user: MemoryOS will open so you can approve
-                      the connector and choose what this AI can access. You can revoke it anytime.
-                    </div>
-
-                    {linkTokenData ? (
-                      <>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-6 break-all text-slate-100">
-                          {connectUrl || "Connect URL is not configured for this environment."}
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button onClick={() => void copyText(connectUrl)} disabled={!connectUrl}>
-                            <Copy className="mr-2 size-4" />
-                            Copy connector link
-                          </Button>
-                          {connectUrl ? (
-                            <Button variant="outline" asChild>
-                              <a href={connectUrl} target="_blank" rel="noreferrer">
-                                <Link2 className="mr-2 size-4" />
-                                Test link
-                              </a>
-                            </Button>
-                          ) : null}
-                        </div>
-                        <p className="text-xs leading-5 text-slate-500">
-                          Expires in {Math.round(linkTokenData.expires_in_seconds / 60)} minutes.
-                          Create a fresh link each time the user starts the connection flow.
-                        </p>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              </>
-            ) : agentsQuery.error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                <div className="text-sm font-medium text-rose-800">
-                  {displayApiError(agentsQuery.error)}
-                </div>
-                <Button className="mt-3" variant="outline" onClick={() => void agentsQuery.mutate()}>
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                Create a Passport agent first. Then this panel will generate the consent URL
-                for your user-facing Connect shared memory button.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </>
+          ) : agentsQuery.error ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <div className="text-sm font-medium text-rose-800">{displayApiError(agentsQuery.error)}</div>
+              <Button className="mt-3" variant="outline" onClick={() => void agentsQuery.mutate()}>Retry</Button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              Create a Passport agent first. Then this area will generate a consent URL or secure connector link.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Passport agents</CardTitle>
-          <CardDescription>
-            Public agent identities registered by this workspace. Private keys are shown only
-            once at creation time.
-          </CardDescription>
+          <CardDescription>Public identities registered by this workspace. Private keys are shown only once at creation time.</CardDescription>
         </CardHeader>
         <CardContent>
           {agentsQuery.isLoading && !agentsQuery.data ? (
-            <div className="space-y-3">
-              <div className="h-16 animate-pulse rounded-xl bg-slate-200" />
-              <div className="h-16 animate-pulse rounded-xl bg-slate-200" />
-            </div>
+            <div className="space-y-3"><div className="h-16 animate-pulse rounded-xl bg-slate-200" /><div className="h-16 animate-pulse rounded-xl bg-slate-200" /></div>
           ) : agents.length > 0 ? (
             <div className="grid gap-3">
               {agents.map((agent) => (
                 <article key={agent.id} className="rounded-2xl border border-slate-200 p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="font-semibold text-slate-950">{agent.name}</h2>
-                        <AgentStatusBadge agent={agent} />
-                      </div>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Created {formatDate(agent.created_at)}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2"><h2 className="font-semibold text-slate-950">{agent.name}</h2><AgentStatusBadge agent={agent} /></div>
+                      <p className="mt-1 text-sm text-slate-500">Created {formatDate(agent.created_at)}</p>
                       <p className="mt-2 font-mono text-xs text-slate-500">{agent.id}</p>
-                      {agent.description ? (
-                        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{agent.description}</p>
-                      ) : null}
+                      {agent.description ? <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{agent.description}</p> : null}
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => void copyText(agent.id)}>
-                      <Copy className="mr-2 size-4" />
-                      Copy agent ID
-                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => void copyText(agent.id)}><Copy className="mr-2 size-4" />Copy agent ID</Button>
                   </div>
                 </article>
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
-              No Passport agents yet.
-            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">No Passport agents yet.</div>
           )}
         </CardContent>
       </Card>
 
-      <RevealKeyDialog
-        open={revealOpen}
-        rawKey={rawAgentKey}
-        onOpenChange={setRevealOpen}
-        onCloseComplete={() => setRawAgentKey(null)}
-      />
+      <RevealKeyDialog open={revealOpen} rawKey={rawAgentKey} onOpenChange={setRevealOpen} onCloseComplete={() => setRawAgentKey(null)} />
     </div>
   );
 }
