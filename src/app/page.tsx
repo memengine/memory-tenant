@@ -45,6 +45,7 @@ import {
   ApiRequestError,
   type QuotaMode,
   displayApiError,
+  isWorkspaceAccessError,
   getAllTenantUsers,
   getGateBreakdown,
   getMemoryAdditions,
@@ -352,6 +353,25 @@ export default function OverviewPage() {
   const additionsErrorMessage = displayApiError(additionsError);
   const gateBreakdownErrorMessage = displayApiError(gateBreakdownError);
   const recentActivityErrorMessage = displayApiError(recentActivityError);
+  const overviewErrors = [
+    usageError,
+    usersError,
+    conflictStatsError,
+    additionsError,
+    gateBreakdownError,
+    recentActivityError,
+    domain.error,
+  ];
+  const workspaceAccessBlocked = overviewErrors.some(isWorkspaceAccessError);
+  const workspaceAccessMessage =
+    overviewErrors.map(displayApiError).find(Boolean) ??
+    "Workspace access is not ready yet. Refresh once after creating or switching workspaces.";
+  const visibleUsageError = workspaceAccessBlocked ? undefined : usageErrorMessage;
+  const visibleUsersError = workspaceAccessBlocked ? undefined : usersErrorMessage;
+  const visibleConflictStatsError = workspaceAccessBlocked ? undefined : conflictStatsErrorMessage;
+  const visibleAdditionsError = workspaceAccessBlocked ? undefined : additionsErrorMessage;
+  const visibleGateBreakdownError = workspaceAccessBlocked ? undefined : gateBreakdownErrorMessage;
+  const visibleRecentActivityError = workspaceAccessBlocked ? undefined : recentActivityErrorMessage;
   const pendingTenantReview =
     conflictStats.data?.pending_tenant_review ??
     conflictStats.data?.requires_attention ??
@@ -450,6 +470,38 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {workspaceAccessBlocked ? (
+        <Card className="border border-amber-200 bg-amber-50 text-amber-950 shadow-sm">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <ShieldAlert className="size-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold">Workspace access needs a refresh</div>
+                <div className="mt-1 max-w-3xl text-sm text-amber-900/80">
+                  {workspaceAccessMessage} If you just changed Clerk keys or created a new workspace, sign out and back in once so MemoryOS receives a fresh organization token.
+                </div>
+              </div>
+            </div>
+            <Button
+              className="w-full sm:w-auto"
+              variant="outline"
+              onClick={() => {
+                void usage.mutate();
+                void users.mutate();
+                void additions.mutate();
+                void gateBreakdown.mutate();
+                void conflictStats.mutate();
+                void domain.mutate();
+              }}
+            >
+              Retry workspace sync
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {usage.data?.mode === "PASSTHROUGH" ? (
         <Card className="border border-rose-200 bg-rose-50 text-rose-950">
           <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -485,7 +537,7 @@ export default function OverviewPage() {
           description="Total memories indexed for this tenant"
           icon={Database}
           loading={users.isLoading && !users.data}
-          error={usersErrorMessage}
+          error={visibleUsersError}
           onRetry={() => void users.mutate()}
         />
         <MetricCard
@@ -494,7 +546,7 @@ export default function OverviewPage() {
           description="Rolling monthly API budget consumption"
           icon={Activity}
           loading={usage.isLoading && !usage.data}
-          error={usageErrorMessage}
+          error={visibleUsageError}
           onRetry={() => void usage.mutate()}
         />
         <MetricCard
@@ -503,7 +555,7 @@ export default function OverviewPage() {
           description="Users with memory activity in the last 30 days"
           icon={Users}
           loading={users.isLoading && !users.data}
-          error={usersErrorMessage}
+          error={visibleUsersError}
           onRetry={() => void users.mutate()}
         />
         <MetricCard
@@ -516,7 +568,7 @@ export default function OverviewPage() {
             (gateBreakdown.isLoading && !gateBreakdown.data)
           }
           error={
-            additionsErrorMessage ?? gateBreakdownErrorMessage
+            visibleAdditionsError ?? visibleGateBreakdownError
           }
           onRetry={() => {
             void additions.mutate();
@@ -530,7 +582,7 @@ export default function OverviewPage() {
             description="conflicts handled automatically this month"
             icon={Zap}
             loading={conflictStats.isLoading && !conflictStats.data}
-            error={conflictStatsErrorMessage}
+            error={visibleConflictStatsError}
             onRetry={() => void conflictStats.mutate()}
             tooltip="MemoryOS detects when users have conflicting information and resolves it automatically using recency and confidence signals."
             tone="green"
@@ -542,7 +594,7 @@ export default function OverviewPage() {
           description="this month - memory kept accurate"
           icon={GitMerge}
           loading={usage.isLoading && !usage.data}
-          error={usageErrorMessage}
+          error={visibleUsageError}
           onRetry={() => void usage.mutate()}
           tooltip="When a new memory contradicts an existing one, MemoryOS resolves the conflict automatically."
           tone={metrics.conflictsResolvedMtd > 0 ? "purple" : "gray"}
@@ -553,7 +605,7 @@ export default function OverviewPage() {
           description="of add() calls produced memories"
           icon={CheckCircle}
           loading={usage.isLoading && !usage.data}
-          error={usageErrorMessage}
+          error={visibleUsageError}
           onRetry={() => void usage.mutate()}
           tooltip="The percentage of queued add() calls that successfully extracted at least one memory."
           tone={
@@ -570,7 +622,7 @@ export default function OverviewPage() {
           description="conversations with no storable information"
           icon={Info}
           loading={usage.isLoading && !usage.data}
-          error={usageErrorMessage}
+          error={visibleUsageError}
           onRetry={() => void usage.mutate()}
           tooltip="These conversations passed the quality gate but contained no facts worth storing, such as greetings, acknowledgements, or off-topic messages. This is normal and expected."
           tone="gray"
@@ -683,7 +735,7 @@ export default function OverviewPage() {
 
       <QuotaBar
         loading={usage.isLoading && !usage.data}
-        error={usageErrorMessage}
+        error={visibleUsageError}
         percentUsed={metrics.quotaUsedPct}
         mode={usage.data?.mode ?? "FULL"}
         callsUsed={usage.data?.calls_used}
@@ -695,13 +747,13 @@ export default function OverviewPage() {
         <MemoryLineChart
           data={additions.data ?? []}
           loading={additions.isLoading && !additions.data}
-          error={additionsErrorMessage}
+          error={visibleAdditionsError}
           onRetry={() => void additions.mutate()}
         />
         <GateDonutChart
           data={gateBreakdown.data ?? []}
           loading={gateBreakdown.isLoading && !gateBreakdown.data}
-          error={gateBreakdownErrorMessage}
+          error={visibleGateBreakdownError}
           onRetry={() => void gateBreakdown.mutate()}
         />
       </section>
@@ -712,7 +764,7 @@ export default function OverviewPage() {
         <ErrorCard
           title="Unable to load recent activity"
           description={
-            recentActivityErrorMessage ??
+            visibleRecentActivityError ??
             "The recent activity feed is temporarily unavailable."
           }
           onRetry={() => void recentActivity.mutate()}
