@@ -1,6 +1,18 @@
-export type TokenGetter = () => Promise<string | null>;
+export type TokenGetter = (options?: { template?: string }) => Promise<string | null>;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+const CLERK_JWT_TEMPLATE = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE;
+
+export async function getDashboardToken(getToken: TokenGetter): Promise<string | null> {
+  if (CLERK_JWT_TEMPLATE) {
+    const templatedToken = await getToken({ template: CLERK_JWT_TEMPLATE });
+    if (templatedToken) {
+      return templatedToken;
+    }
+  }
+
+  return getToken();
+}
 
 export class ApiRequestError extends Error {
   status: number;
@@ -20,8 +32,8 @@ export function displayApiError(error: unknown): string | undefined {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
 
-  if (message === "tenant_auth_required") {
-    return "Select or create a workspace to load tenant data.";
+  if (message === "tenant_auth_required" || message === "unauthorized") {
+    return "Workspace access is not ready yet. Refresh once after creating or switching workspaces.";
   }
   if (message === "tenant_not_found") {
     return "Workspace data is still being created. Refresh once, then try again.";
@@ -46,6 +58,26 @@ export function displayApiError(error: unknown): string | undefined {
   return message;
 }
 
+
+export function isWorkspaceAccessError(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  const status = error instanceof ApiRequestError ? error.status : null;
+
+  return (
+    status === 401 ||
+    status === 403 ||
+    normalized === "unauthorized" ||
+    normalized === "tenant_auth_required" ||
+    normalized === "tenant_not_found" ||
+    normalized.includes("session") ||
+    normalized.includes("jwt")
+  );
+}
 export type QuotaMode =
   | "FULL"
   | "PASSTHROUGH"
@@ -125,6 +157,9 @@ export type SharedContextConflict = {
   auto_resolution?: string | null;
   auto_resolution_at?: string | null;
   requires_attention?: boolean;
+  decision_evidence?: Record<string, unknown> | null;
+  decision_reason_codes?: string[];
+  decision_explanation?: string | null;
 };
 
 export type ConflictStats = {
@@ -541,7 +576,7 @@ async function apiFetch<T>(
     throw new ApiRequestError("NEXT_PUBLIC_API_BASE is not configured.", 500);
   }
 
-  const token = await getToken();
+  const token = await getDashboardToken(getToken);
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     cache: "no-store",
