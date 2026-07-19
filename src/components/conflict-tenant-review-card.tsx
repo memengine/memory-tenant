@@ -1,6 +1,6 @@
 "use client";
 
-import { UserCheck } from "lucide-react";
+import { Info, UserCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,21 @@ function entityLabel(value: string) {
     .join(" ");
 }
 
+function formatReasonCode(value: string) {
+  return value
+    .replace(/^conflict_type:/, "")
+    .replace(/^decision:/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDecisionExplanation(conflict: SharedContextConflict) {
+  return (
+    conflict.decision_explanation ||
+    conflict.resolution_reason ||
+    "MemoryOS routed this conflict for review because it could not safely choose a single organisational truth automatically."
+  );
+}
 function formatRelativeTime(value?: string | null) {
   if (!value) {
     return "unknown time";
@@ -121,6 +136,25 @@ export function ConflictTenantReviewCard({
           {sameUser
             ? "Two equally trusted services disagree. Which claim should MemoryOS use?"
             : "Which reflects your organisation's current reality?"}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 size-4 shrink-0 text-sky-700" />
+            <div>
+              <p className="font-semibold text-slate-950">Why this needs review</p>
+              <p>{formatDecisionExplanation(conflict)}</p>
+              {conflict.decision_reason_codes?.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {conflict.decision_reason_codes.map((code) => (
+                    <Badge key={code} className="border-slate-200 bg-white text-slate-700">
+                      {formatReasonCode(code)}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-3">
