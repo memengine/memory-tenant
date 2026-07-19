@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import {
+  useEffect, useMemo, useState } from "react";
+import {
+  useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
-import { ShieldBan, Sparkles, Users } from "lucide-react";
+import {
+  ShieldBan, Sparkles, Users } from "lucide-react";
 
-import { MetricCard } from "@/components/metric-card";
-import { UserTable } from "@/components/user-table";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  MetricCard } from "@/components/metric-card";
+import {
+  UserTable } from "@/components/user-table";
+import {
+  Card, CardContent } from "@/components/ui/card";
 import {
   blockTenantUser,
   displayApiError,
+  getDashboardToken,
   getTenantUsersPage,
   type TenantUser,
   truncateUserId,
@@ -138,7 +145,7 @@ export default function UsersPage() {
   }
 
   async function handleExportCsv() {
-    const token = await getToken();
+    const token = await getDashboardToken(getToken);
     const apiBase = process.env.NEXT_PUBLIC_API_BASE;
 
     if (apiBase) {
