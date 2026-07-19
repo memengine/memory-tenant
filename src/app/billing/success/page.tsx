@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
+import { getDashboardToken } from "@/lib/api";
+
 type SubscriptionPayload = {
   plan_tier?: "free" | "starter" | "growth" | "enterprise";
   limits?: {
@@ -74,7 +76,7 @@ export default function BillingSuccessPage() {
 
     async function pollSubscription() {
       try {
-        const token = await getToken();
+        const token = await getDashboardToken(getToken);
         const response = await fetch(`${apiBase}/v1/billing/subscription`, {
           cache: "no-store",
           headers: {
