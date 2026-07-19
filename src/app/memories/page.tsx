@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import {
+  useMemo, useState } from "react";
+import {
+  useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import {
   Archive,
@@ -16,11 +18,16 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { MemoryHistorySlideover } from "@/components/memory-history-slideover";
-import { MetricCard } from "@/components/metric-card";
-import { SdkQuickstart } from "@/components/sdk-quickstart";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import {
+  MemoryHistorySlideover } from "@/components/memory-history-slideover";
+import {
+  MetricCard } from "@/components/metric-card";
+import {
+  SdkQuickstart } from "@/components/sdk-quickstart";
+import {
+  Badge } from "@/components/ui/badge";
+import {
+  Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -46,6 +53,8 @@ import {
 import {
   ApiRequestError,
   displayApiError,
+  getDashboardToken,
+  isWorkspaceAccessError,
   type MemoryRecord,
   type PaginatedResponse,
   type TokenGetter,
@@ -105,7 +114,7 @@ async function fetchMemories(
     search.set("time_filter_days", options.timeRange);
   }
 
-  const token = await getToken();
+  const token = await getDashboardToken(getToken);
   const response = await fetch(`${API_BASE}/v1/memories?${search.toString()}`, {
     cache: "no-store",
     headers: {
@@ -258,7 +267,11 @@ export default function MemoriesPage() {
       topCategory,
     };
   }, [memories.data]);
-  const errorMessage = displayApiError(memories.error);
+  const memoryError = memories.error as ApiRequestError | undefined;
+  const workspaceAccessBlocked = isWorkspaceAccessError(memoryError);
+  const errorMessage = workspaceAccessBlocked
+    ? undefined
+    : displayApiError(memoryError);
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
@@ -363,6 +376,11 @@ export default function MemoriesPage() {
               <div className="h-10 animate-pulse rounded-xl bg-slate-200" />
               <div className="h-10 animate-pulse rounded-xl bg-slate-200" />
               <div className="h-10 animate-pulse rounded-xl bg-slate-200" />
+            </div>
+          ) : workspaceAccessBlocked ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Workspace memory records will appear here after the workspace is
+              synced. Use the Overview page to refresh workspace access.
             </div>
           ) : memories.error ? (
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
