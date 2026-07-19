@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import {
+  useParams, useRouter } from "next/navigation";
+import {
+  useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import {
   AlertTriangle,
@@ -13,11 +16,16 @@ import {
   Trash2,
 } from "lucide-react";
 
-import { MemoryList } from "@/components/memory-list";
-import { MetricCard } from "@/components/metric-card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  MemoryList } from "@/components/memory-list";
+import {
+  MetricCard } from "@/components/metric-card";
+import {
+  Badge } from "@/components/ui/badge";
+import {
+  Button } from "@/components/ui/button";
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -26,11 +34,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import {
+  Input } from "@/components/ui/input";
 import {
   ApiRequestError,
   deleteMemory,
   deleteTenantUser,
+  getDashboardToken,
   getTenantUserDetail,
   listMemories,
   truncateUserId,
@@ -146,7 +156,7 @@ export default function UserDetailPage() {
     setExportError(null);
 
     try {
-      const token = await getToken();
+      const token = await getDashboardToken(getToken);
       const response = await fetch(
         `${API_BASE}/v1/users/${encodeURIComponent(externalUserId)}/export`,
         {
