@@ -20,6 +20,7 @@ import {
   Settings,
   ShieldAlert,
   Users,
+  Workflow,
 } from "lucide-react";
 
 import {
@@ -37,6 +38,7 @@ const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/memories", label: "Memories", icon: Brain },
   { href: "/playground", label: "Playground", icon: Sparkles },
+  { href: "/studio", label: "Studio", icon: Workflow },
   { href: "/sdk", label: "SDK", icon: Code2 },
   { href: "/memory-passport", label: "Memory Passport", icon: Fingerprint },
   { href: "/users", label: "Users", icon: Users },
@@ -223,3 +225,5 @@ export function Sidebar() {
     </>
   );
 }
+
+
