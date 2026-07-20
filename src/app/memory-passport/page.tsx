@@ -223,12 +223,14 @@ export default function MemoryPassportPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 pt-14 md:pt-0">
+    <div
+      className="flex flex-col gap-6 pt-14 text-[15px] leading-relaxed text-slate-800 antialiased md:pt-0"
+    >
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white shadow-sm">
         <div className="grid gap-8 p-6 lg:grid-cols-[1fr_420px] lg:p-8">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-300">Memory Passport</span>
-            <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="mt-3 max-w-3xl text-3xl font-medium leading-tight tracking-[-0.01em] sm:text-4xl">
               Let users approve what your AI agents can remember.
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
@@ -236,11 +238,11 @@ export default function MemoryPassportPage() {
             </p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-sm font-semibold text-white">Setup path</div>
+            <div className="text-sm font-medium text-white">Setup path</div>
             <div className="mt-4 space-y-3 text-sm text-slate-300">
               {["Create a Passport agent profile users can recognize.", "Choose a consent URL or secure-link connector flow.", "User approves access in the MemoryOS consent center."].map((item, index) => (
                 <div key={item} className="flex items-start gap-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400 text-xs font-bold text-slate-950">{index + 1}</span>
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400 text-xs font-semibold text-slate-950">{index + 1}</span>
                   <span>{item}</span>
                 </div>
               ))}
@@ -308,15 +310,15 @@ export default function MemoryPassportPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-3 text-center">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-2xl font-semibold text-slate-950">{agents.length}</div>
+                <div className="text-2xl font-medium text-slate-950">{agents.length}</div>
                 <div className="mt-1 text-xs text-slate-500">Agents</div>
               </div>
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
-                <div className="text-2xl font-semibold text-emerald-900">{verifiedCount}</div>
+                <div className="text-2xl font-medium text-emerald-900">{verifiedCount}</div>
                 <div className="mt-1 text-xs text-emerald-700">Verified</div>
               </div>
               <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                <div className="text-2xl font-semibold text-amber-900">{reviewCount}</div>
+                <div className="text-2xl font-medium text-amber-900">{reviewCount}</div>
                 <div className="mt-1 text-xs text-amber-700">Review</div>
               </div>
             </CardContent>
