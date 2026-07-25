@@ -65,7 +65,7 @@ export function CreateKeyDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Name</label>
+            <label className="text-sm font-medium text-foreground">Name</label>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -74,18 +74,18 @@ export function CreateKeyDialog({
           </div>
 
           <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-700">Permissions</div>
+            <div className="text-sm font-medium text-foreground">Permissions</div>
             <div className="grid grid-cols-2 gap-3">
               {PERMISSION_OPTIONS.map((permission) => (
                 <label
                   key={permission}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700"
+                  className="flex items-center gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2 text-sm text-foreground transition hover:border-cyan-300/40 hover:bg-muted/45 has-[:checked]:border-cyan-400/50 has-[:checked]:bg-cyan-400/10"
                 >
                   <input
                     type="checkbox"
                     checked={selectedPermissions.includes(permission)}
                     onChange={() => togglePermission(permission)}
-                    className="size-4 rounded border-slate-300"
+                    className="size-4 rounded border-border accent-cyan-400"
                   />
                   <span className="capitalize">{permission}</span>
                 </label>
@@ -95,7 +95,7 @@ export function CreateKeyDialog({
         </div>
 
         <DialogFooter showCloseButton>
-          <Button onClick={() => void handleSubmit()} disabled={busy || !canSubmit}>
+          <Button className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" onClick={() => void handleSubmit()} disabled={busy || !canSubmit}>
             {busy ? "Creating..." : "Create key"}
           </Button>
         </DialogFooter>
