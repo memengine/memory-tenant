@@ -176,7 +176,7 @@ function WriterDialog({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-800">Service key</span>
+            <span className="text-sm font-medium text-foreground">Service key</span>
             <Input
               value={form.serviceKey}
               disabled={Boolean(writer)}
@@ -187,7 +187,7 @@ function WriterDialog({
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-800">Display name</span>
+            <span className="text-sm font-medium text-foreground">Display name</span>
             <Input
               value={form.displayName}
               placeholder="Billing Service"
@@ -197,7 +197,7 @@ function WriterDialog({
             />
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-800">Bound API key</span>
+            <span className="text-sm font-medium text-foreground">Bound API key</span>
             <Select
               value={form.apiKeyId}
               onValueChange={(value) =>
@@ -220,7 +220,7 @@ function WriterDialog({
             </Select>
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-medium text-slate-800">Default authority</span>
+            <span className="text-sm font-medium text-foreground">Default authority</span>
             <Input
               type="number"
               min={0}
@@ -233,10 +233,10 @@ function WriterDialog({
           </label>
         </div>
 
-        <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="space-y-3 rounded-xl border border-border bg-muted/40 p-4">
           <div>
-            <div className="text-sm font-semibold text-slate-900">Category authority</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-sm font-semibold text-foreground">Category authority</div>
+            <div className="text-xs text-muted-foreground">
               Leave a category blank to use the default. Higher values win deterministic
               conflicts.
             </div>
@@ -244,7 +244,7 @@ function WriterDialog({
           <div className="grid gap-3 sm:grid-cols-3">
             {MEMORY_CATEGORIES.map((category) => (
               <label key={category} className="space-y-1.5">
-                <span className="text-xs font-medium capitalize text-slate-700">{category}</span>
+                <span className="text-xs font-medium capitalize text-foreground">{category}</span>
                 <Input
                   type="number"
                   min={0}
@@ -267,13 +267,14 @@ function WriterDialog({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
             {error}
           </div>
         ) : null}
 
         <DialogFooter showCloseButton>
           <Button
+            className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
             disabled={
               busy ||
               !form.displayName.trim() ||
