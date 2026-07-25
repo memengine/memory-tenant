@@ -222,8 +222,12 @@ export function DomainSelectionModal({
     >
       <div className="mx-auto max-w-6xl rounded-[2rem] border border-white/70 bg-white/95 p-5 shadow-2xl sm:p-8">
         <header className="space-y-3 text-center">
-          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-slate-950 text-lg font-semibold text-white">
-            M
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <img
+              src="/brand/logo-mark.svg"
+              alt="MemoryOS"
+              className="size-10"
+            />
           </div>
           <div>
             <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
