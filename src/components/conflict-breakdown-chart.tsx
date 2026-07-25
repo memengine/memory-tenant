@@ -68,8 +68,13 @@ export function ConflictBreakdownChart({
           No shared context conflicts have been auto-resolved this month yet.
         </div>
       ) : (
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-72 min-w-0">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+            minWidth={0}
+            initialDimension={{ width: 640, height: 288 }}
+          >
             <BarChart
               data={rows}
               layout="vertical"
