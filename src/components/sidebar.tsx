@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
+import { OrganizationSwitcher, UserButton, useAuth } from "@clerk/nextjs";
 import {
   Activity,
   BookOpen,
@@ -57,6 +57,24 @@ function isActivePath(pathname: string, href: string): boolean {
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "tenant-brand-mark flex shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm",
+        compact ? "size-9" : "size-11",
+      )}
+    >
+      <img
+        src="/brand/logo-mark.svg"
+        alt=""
+        aria-hidden="true"
+        className={compact ? "size-6" : "size-8"}
+      />
+    </div>
+  );
 }
 
 function SidebarNav() {
@@ -118,12 +136,12 @@ function SidebarNav() {
 }
 
 function SidebarRail() {
+  const { isLoaded, isSignedIn } = useAuth();
+
   return (
-    <div className="flex h-full w-64 min-w-0 max-w-64 flex-col overflow-hidden border-r border-slate-200 bg-white">
+    <div className="tenant-sidebar flex h-full w-64 min-w-0 max-w-64 flex-col overflow-hidden border-r border-slate-200 bg-white">
       <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-5">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-slate-950 text-sm font-semibold text-white">
-          M
-        </div>
+        <BrandMark />
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-slate-950">MemoryOS</div>
           <div className="text-xs text-slate-500">Tenant Dashboard</div>
@@ -140,21 +158,28 @@ function SidebarRail() {
             <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
               Workspace
             </div>
-            <OrganizationSwitcher
-              hidePersonal
-              afterSelectOrganizationUrl="/"
-              afterCreateOrganizationUrl="/"
-              appearance={{
-                elements: {
-                  organizationSwitcherTrigger:
-                    "w-full max-w-full min-w-0 justify-between overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50",
-                  organizationPreviewMainIdentifier:
-                    "max-w-[150px] truncate text-sm font-medium text-slate-900",
-                  organizationPreviewSecondaryIdentifier:
-                    "max-w-[150px] truncate text-xs text-slate-500",
-                },
-              }}
-            />
+            {isLoaded && isSignedIn ? (
+              <OrganizationSwitcher
+                hidePersonal
+                afterSelectOrganizationUrl="/"
+                afterCreateOrganizationUrl="/"
+                appearance={{
+                  elements: {
+                    organizationSwitcherTrigger:
+                      "w-full max-w-full min-w-0 justify-between overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50",
+                    organizationPreviewMainIdentifier:
+                      "max-w-[150px] truncate text-sm font-medium text-slate-900",
+                    organizationPreviewSecondaryIdentifier:
+                      "max-w-[150px] truncate text-xs text-slate-500",
+                  },
+                }}
+              />
+            ) : (
+              <div
+                className="h-10 w-full animate-pulse rounded-xl border border-slate-200 bg-white"
+                aria-hidden="true"
+              />
+            )}
           </div>
 
           <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
@@ -170,13 +195,15 @@ function SidebarRail() {
                 Tenant access active
               </div>
             </div>
-            <UserButton
-              appearance={{
-                elements: {
-                  userButtonAvatarBox: "size-10 ring-1 ring-slate-200",
-                },
-              }}
-            />
+            {isLoaded && isSignedIn ? (
+              <UserButton
+                appearance={{
+                  elements: {
+                    userButtonAvatarBox: "size-10 ring-1 ring-slate-200",
+                  },
+                }}
+              />
+            ) : null}
           </div>
         </div>
       </div>
@@ -185,9 +212,11 @@ function SidebarRail() {
 }
 
 export function Sidebar() {
+  const { isLoaded, isSignedIn } = useAuth();
+
   return (
     <>
-      <div className="fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur md:hidden">
+      <div className="tenant-sidebar fixed inset-x-0 top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur md:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Dialog>
@@ -204,18 +233,21 @@ export function Sidebar() {
                 <SidebarRail />
               </DialogContent>
             </Dialog>
+            <BrandMark compact />
             <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-slate-950">MemoryOS</div>
+              <div className="truncate text-sm font-semibold text-slate-950">MemoryOS</div>
               <div className="text-xs text-slate-500">Tenant Dashboard</div>
             </div>
           </div>
-          <UserButton
-            appearance={{
-              elements: {
-                userButtonAvatarBox: "size-9 ring-1 ring-slate-200",
-              },
-            }}
-          />
+          {isLoaded && isSignedIn ? (
+            <UserButton
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: "size-9 ring-1 ring-slate-200",
+                },
+              }}
+            />
+          ) : null}
         </div>
       </div>
 
