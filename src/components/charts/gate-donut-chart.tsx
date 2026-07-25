@@ -63,8 +63,13 @@ export function GateDonutChart({
           </div>
         ) : (
           <>
-            <div className="h-[240px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-[240px] min-w-0">
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={0}
+                initialDimension={{ width: 320, height: 240 }}
+              >
                 <PieChart>
                   <Pie
                     data={data}
