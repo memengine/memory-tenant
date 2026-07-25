@@ -54,8 +54,13 @@ export function MemoryLineChart({
             No memory additions yet.
           </div>
         ) : (
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[320px] min-w-0">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              initialDimension={{ width: 640, height: 320 }}
+            >
               <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
                 <XAxis
