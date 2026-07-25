@@ -101,7 +101,7 @@ export type TenantUsage = {
   mode: QuotaMode;
   budget_remaining_pct: number;
   reset_at: string | null;
-  plan_tier: "free" | "starter" | "growth" | "enterprise";
+  plan_tier: "free" | "starter" | "growth" | "scale" | "enterprise";
   conflicts_resolved_mtd?: number;
   extraction_success_rate?: number;
   nothing_to_extract_rate?: number;
