@@ -49,7 +49,18 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-const docsHref = "https://memoryengine.mintlify.app";
+const docsBase = (process.env.NEXT_PUBLIC_DOCS_URL ?? "https://memoryengine.mintlify.app").replace(/\/$/, "");
+const docsHref = docsBase;
+const legalLinks = [
+  { label: "Privacy", href: `${docsBase}/privacy` },
+  { label: "Terms", href: `${docsBase}/terms` },
+  { label: "Refunds", href: `${docsBase}/refund-cancellation` },
+  { label: "Cookies", href: `${docsBase}/cookie-policy` },
+  { label: "Security", href: `${docsBase}/security` },
+  { label: "DPA", href: `${docsBase}/dpa` },
+  { label: "Support", href: `${docsBase}/support-availability` },
+  { label: "Contact", href: `${docsBase}/contact` },
+];
 
 function isActivePath(pathname: string, href: string): boolean {
   if (href === "/") {
@@ -205,6 +216,23 @@ function SidebarRail() {
               />
             ) : null}
           </div>
+
+          <nav
+            aria-label="Legal and support links"
+            className="mt-4 flex flex-wrap gap-x-3 gap-y-1 border-t border-slate-200 pt-3 text-[11px] font-medium text-slate-500"
+          >
+            {legalLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:text-slate-900"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
         </div>
       </div>
     </div>
