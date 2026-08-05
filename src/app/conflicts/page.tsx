@@ -161,6 +161,7 @@ function ResolvedConflictCard({ conflict }: { conflict: SharedContextConflict })
 export default function ConflictsPage() {
   const { isLoaded, getToken } = useAuth();
   const [busyConflictId, setBusyConflictId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
   const [resolvedTab, setResolvedTab] = useState<"user" | "tenant" | "both">("user");
   const stats = useConflictStats();
   const conflicts = useSWR(
@@ -207,11 +208,14 @@ export default function ConflictsPage() {
     correctUser: "A" | "B" | "both_valid",
   ) {
     setBusyConflictId(conflict.id);
+    setResolveError(null);
     try {
       await resolveTenantConflict(getToken, conflict.id, {
         correct_user: correctUser,
       });
       await Promise.all([stats.mutate(), conflicts.mutate()]);
+    } catch (error) {
+      setResolveError(displayApiError(error) ?? "Failed to resolve conflict. Please try again.");
     } finally {
       setBusyConflictId(null);
     }
@@ -320,6 +324,12 @@ export default function ConflictsPage() {
                 confirm the personal truth, then this will move to Resolved.
               </div>
             </section>
+          ) : null}
+
+          {resolveError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+              {resolveError}
+            </div>
           ) : null}
 
           {stats.data.pending_tenant_review > 0 ? (
