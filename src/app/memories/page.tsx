@@ -23,8 +23,6 @@ import {
 import {
   MetricCard } from "@/components/metric-card";
 import {
-  SdkQuickstart } from "@/components/sdk-quickstart";
-import {
   Badge } from "@/components/ui/badge";
 import {
   Button } from "@/components/ui/button";
@@ -328,7 +326,13 @@ export default function MemoriesPage() {
       </section>
 
       {metrics.total === 0 && !memories.isLoading && !memories.error ? (
-        <SdkQuickstart emptyState />
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-600">
+          No memories yet. Use the{" "}
+          <Link href="/sdk" className="font-semibold text-sky-700 hover:text-sky-900">
+            SDK tab
+          </Link>{" "}
+          to get started with your integration.
+        </div>
       ) : null}
 
       <Card>
@@ -444,7 +448,7 @@ export default function MemoriesPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="py-10 text-center text-slate-500">
-                      No memories yet. Follow the quick start above.
+                      No memories found for the selected time range.
                     </TableCell>
                   </TableRow>
                 )}
