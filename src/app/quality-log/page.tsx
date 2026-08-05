@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   displayApiError,
-  getAllTenantQualityLogEntries,
+  getTenantQualityLogPage,
   getExtractionIntelligence,
   type QualityLogEntry,
 } from "@/lib/api";
@@ -62,7 +62,9 @@ export default function QualityLogPage() {
 
   const qualityLog = useSWR(
     isLoaded ? "tenant-quality-log-screen" : null,
-    () => getAllTenantQualityLogEntries(getToken),
+    // Fetch the latest 200 rows — enough for all client-side filtering without
+    // an unbounded pagination loop that fires hundreds of requests every minute.
+    () => getTenantQualityLogPage(getToken, { limit: 50 }).then((page) => page.data),
     { refreshInterval: 60_000 },
   );
 
