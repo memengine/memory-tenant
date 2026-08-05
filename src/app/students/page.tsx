@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import useSWRInfinite from "swr/infinite";
-import { AlertTriangle, GraduationCap, Loader2 } from "lucide-react";
+import { AlertTriangle, BookOpen, CalendarClock, GraduationCap, Loader2, Users } from "lucide-react";
 
+import { MetricCard } from "@/components/metric-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,36 +31,22 @@ import {
 } from "@/lib/api";
 
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "Unknown";
-  }
+  if (!value) return "Unknown";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
+  if (Number.isNaN(date.getTime())) return "Unknown";
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(date);
 }
 
 function formatExamCountdown(student: TenantStudentSummary): string {
-  if (student.days_to_exam === null || student.days_to_exam === undefined) {
-    return "No exam date";
-  }
-  if (student.days_to_exam < 0) {
-    return "Exam passed";
-  }
-  if (student.days_to_exam === 0) {
-    return "Today";
-  }
+  if (student.days_to_exam === null || student.days_to_exam === undefined) return "No exam date";
+  if (student.days_to_exam < 0) return "Exam passed";
+  if (student.days_to_exam === 0) return "Today";
   return `${student.days_to_exam} days`;
 }
 
 function riskClassName(count: number): string {
-  if (count >= 3) {
-    return "bg-rose-100 text-rose-700";
-  }
-  if (count > 0) {
-    return "bg-amber-100 text-amber-700";
-  }
+  if (count >= 3) return "bg-rose-100 text-rose-700";
+  if (count > 0) return "bg-amber-100 text-amber-700";
   return "bg-emerald-100 text-emerald-700";
 }
 
@@ -71,12 +59,8 @@ export default function StudentsPage() {
       pageIndex,
       previousPageData: Awaited<ReturnType<typeof getTenantStudentsPage>> | null,
     ) => {
-      if (!isLoaded || domain.domainSchema !== "edtech") {
-        return null;
-      }
-      if (previousPageData && !previousPageData.pagination.next_cursor) {
-        return null;
-      }
+      if (!isLoaded || domain.domainSchema !== "edtech") return null;
+      if (previousPageData && !previousPageData.pagination.next_cursor) return null;
       return [
         "tenant-students",
         pageIndex,
@@ -88,11 +72,22 @@ export default function StudentsPage() {
     { refreshInterval: 60_000 },
   );
 
-  const rows: TenantStudentSummary[] = (students.data ?? []).flatMap(
-    (page) => page.data,
-  );
+  const rows: TenantStudentSummary[] = (students.data ?? []).flatMap((page) => page.data);
   const lastPage = students.data?.[students.data.length - 1];
   const nextCursor = lastPage?.pagination.next_cursor ?? null;
+  const isLoading = students.isLoading && !students.data;
+
+  const metrics = useMemo(() => {
+    const atRisk = rows.filter((s) => s.forgetting_risk_count >= 3).length;
+    const withExam = rows.filter(
+      (s) =>
+        s.days_to_exam !== null &&
+        s.days_to_exam !== undefined &&
+        s.days_to_exam >= 0 &&
+        s.days_to_exam <= 7,
+    ).length;
+    return { total: rows.length, atRisk, withExamSoon: withExam };
+  }, [rows]);
 
   if (domain.isLoading) {
     return (
@@ -140,95 +135,112 @@ export default function StudentsPage() {
         </p>
       </div>
 
+      <section className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          title="Total Students"
+          value={metrics.total.toLocaleString("en-IN")}
+          description="Students with active memory profiles"
+          icon={Users}
+          loading={isLoading}
+        />
+        <MetricCard
+          title="High Forgetting Risk"
+          value={metrics.atRisk.toLocaleString("en-IN")}
+          description="Students with 3 or more at-risk topics"
+          icon={BookOpen}
+          loading={isLoading}
+        />
+        <MetricCard
+          title="Exam Within 7 Days"
+          value={metrics.withExamSoon.toLocaleString("en-IN")}
+          description="Students with an upcoming exam this week"
+          icon={CalendarClock}
+          loading={isLoading}
+        />
+      </section>
+
       <Card>
         <CardHeader>
           <CardTitle>Student memory profiles</CardTitle>
           <CardDescription>
-            Grade, exam context, weak topic count, and forgetting risk for each
-            active student.
+            Grade, exam context, weak topic count, and forgetting risk for each active student.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {students.error ? (
-            <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-              Unable to load students. Try again after confirming EdTech schema
-              is enabled.
+              Unable to load students. Try again after confirming EdTech schema is enabled.
             </div>
           ) : null}
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student ID</TableHead>
-                <TableHead>Grade + Board</TableHead>
-                <TableHead>Exam Countdown</TableHead>
-                <TableHead>Weak Topics</TableHead>
-                <TableHead>Last Session</TableHead>
-                <TableHead>Forgetting Risk</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length > 0 ? (
-                rows.map((student) => (
-                  <TableRow key={student.external_user_id}>
-                    <TableCell className="font-medium text-slate-900">
-                      {truncateUserId(student.external_user_id)}
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      {student.grade_level ?? "Unknown"}
-                      {student.board_or_curriculum
-                        ? ` | ${student.board_or_curriculum}`
-                        : ""}
-                    </TableCell>
-                    <TableCell className="text-slate-600">
-                      <div>{formatExamCountdown(student)}</div>
-                      {student.exam_name ? (
-                        <div className="text-xs text-slate-400">
-                          {student.exam_name}
-                        </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>{student.weak_topics_count}</TableCell>
-                    <TableCell className="text-slate-600">
-                      {formatDate(student.last_session_at)}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${riskClassName(
-                          student.forgetting_risk_count,
-                        )}`}
-                      >
-                        {student.forgetting_risk_count === 0
-                          ? "-"
-                          : student.forgetting_risk_count}
-                      </span>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-10 animate-pulse rounded-xl bg-slate-200" />
+              ))}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student ID</TableHead>
+                  <TableHead>Grade + Board</TableHead>
+                  <TableHead>Exam Countdown</TableHead>
+                  <TableHead>Weak Topics</TableHead>
+                  <TableHead>Last Session</TableHead>
+                  <TableHead>Forgetting Risk</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length > 0 ? (
+                  rows.map((student) => (
+                    <TableRow key={student.external_user_id}>
+                      <TableCell className="font-medium text-slate-900">
+                        {truncateUserId(student.external_user_id)}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        {student.grade_level ?? "Unknown"}
+                        {student.board_or_curriculum ? ` | ${student.board_or_curriculum}` : ""}
+                      </TableCell>
+                      <TableCell className="text-slate-600">
+                        <div>{formatExamCountdown(student)}</div>
+                        {student.exam_name ? (
+                          <div className="text-xs text-slate-400">{student.exam_name}</div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{student.weak_topics_count}</TableCell>
+                      <TableCell className="text-slate-600">
+                        {formatDate(student.last_session_at)}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${riskClassName(student.forgetting_risk_count)}`}
+                        >
+                          {student.forgetting_risk_count === 0 ? "—" : student.forgetting_risk_count}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell className="py-10 text-center text-slate-500" colSpan={6}>
+                      No EdTech student profiles yet.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    className="py-10 text-center text-slate-500"
-                    colSpan={6}
-                  >
-                    {students.isLoading
-                      ? "Loading students..."
-                      : "No EdTech student profiles yet."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          )}
 
           {nextCursor ? (
             <div className="mt-5 flex justify-center">
               <Button
                 variant="outline"
                 onClick={() => void students.setSize(students.size + 1)}
-                disabled={students.isLoading}
+                disabled={students.isValidating}
               >
-                {students.isLoading ? "Loading..." : "Load more students"}
+                {students.isValidating ? "Loading..." : "Load more students"}
               </Button>
             </div>
           ) : null}
