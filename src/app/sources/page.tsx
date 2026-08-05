@@ -267,7 +267,7 @@ function WriterDialog({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
             {error}
           </div>
         ) : null}
