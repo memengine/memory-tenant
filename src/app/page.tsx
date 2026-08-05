@@ -24,6 +24,7 @@ import {
 import { MemoryLineChart } from "@/components/charts/memory-line-chart";
 import { MetricCard } from "@/components/metric-card";
 import { QuotaBar } from "@/components/quota-bar";
+import { ToastNotification } from "@/components/toast-notification";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -200,8 +201,7 @@ function EngineMetricCard({
   return (
     <Card className="min-h-[170px]" title={tooltip}>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="space-y-1">
-          <CardDescription>{title}</CardDescription>
+        <div>
           <CardTitle className="text-base text-slate-950">{title}</CardTitle>
         </div>
         <div className={`rounded-xl p-2.5 ${toneClassName}`}>
@@ -215,11 +215,10 @@ function EngineMetricCard({
             <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
           </div>
         ) : error ? (
-          <div className="space-y-3">
-            <div className="text-sm font-medium text-rose-700">{error}</div>
-            <Button variant="outline" size="sm" onClick={onRetry}>
-              Retry
-            </Button>
+          // Error handled by page-level banner; show neutral dash.
+          <div className="space-y-2">
+            <div className="text-3xl font-semibold tracking-tight text-slate-400">—</div>
+            <p className="text-sm text-slate-400">{description}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -344,15 +343,10 @@ export default function OverviewPage() {
   const usageError = usage.error as ApiRequestError | undefined;
   const usersError = users.error as ApiRequestError | undefined;
   const conflictStatsError = conflictStats.error as ApiRequestError | undefined;
-  const usageErrorMessage = displayApiError(usageError);
-  const usersErrorMessage = displayApiError(usersError);
-  const conflictStatsErrorMessage = displayApiError(conflictStatsError);
   const additionsError = additions.error as ApiRequestError | undefined;
   const gateBreakdownError = gateBreakdown.error as ApiRequestError | undefined;
   const recentActivityError = recentActivity.error as ApiRequestError | undefined;
-  const additionsErrorMessage = displayApiError(additionsError);
-  const gateBreakdownErrorMessage = displayApiError(gateBreakdownError);
-  const recentActivityErrorMessage = displayApiError(recentActivityError);
+
   const overviewErrors = [
     usageError,
     usersError,
@@ -362,16 +356,37 @@ export default function OverviewPage() {
     recentActivityError,
     domain.error,
   ];
+
   const workspaceAccessBlocked = overviewErrors.some(isWorkspaceAccessError);
   const workspaceAccessMessage =
     overviewErrors.map(displayApiError).find(Boolean) ??
     "Workspace access is not ready yet. Refresh once after creating or switching workspaces.";
-  const visibleUsageError = workspaceAccessBlocked ? undefined : usageErrorMessage;
-  const visibleUsersError = workspaceAccessBlocked ? undefined : usersErrorMessage;
-  const visibleConflictStatsError = workspaceAccessBlocked ? undefined : conflictStatsErrorMessage;
-  const visibleAdditionsError = workspaceAccessBlocked ? undefined : additionsErrorMessage;
-  const visibleGateBreakdownError = workspaceAccessBlocked ? undefined : gateBreakdownErrorMessage;
-  const visibleRecentActivityError = workspaceAccessBlocked ? undefined : recentActivityErrorMessage;
+
+  // Consolidate all non-auth errors into a single page-level banner.
+  // Cards show "--" silently instead of repeating the same message 7 times.
+  const hasPageLevelError =
+    !workspaceAccessBlocked && overviewErrors.some(Boolean);
+  const pageLevelErrorMessage = hasPageLevelError
+    ? (overviewErrors.map(displayApiError).find(Boolean) ?? "Some data could not be loaded.")
+    : undefined;
+
+  function retryAll() {
+    void usage.mutate();
+    void users.mutate();
+    void additions.mutate();
+    void gateBreakdown.mutate();
+    void conflictStats.mutate();
+    void domain.mutate();
+    void recentActivity.mutate();
+  }
+
+  // Cards never show individual error text — the page banner handles it.
+  const visibleUsageError = undefined;
+  const visibleUsersError = undefined;
+  const visibleConflictStatsError = undefined;
+  const visibleAdditionsError = undefined;
+  const visibleGateBreakdownError = undefined;
+  const visibleRecentActivityError = undefined;
   const pendingTenantReview =
     conflictStats.data?.pending_tenant_review ??
     conflictStats.data?.requires_attention ??
@@ -404,7 +419,6 @@ export default function OverviewPage() {
         onClose={handleDomainSelectionClose}
         onNotice={(message, tone) => {
           setDomainToast({ message, tone });
-          window.setTimeout(() => setDomainToast(null), 4500);
         }}
         onSelected={() => {
           setDomainSelectionCompleted(true);
@@ -414,17 +428,11 @@ export default function OverviewPage() {
           void additions.mutate();
         }}
       />
-      {domainToast ? (
-        <div
-          className={
-            domainToast.tone === "success"
-              ? "fixed bottom-6 right-6 z-[80] rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg"
-              : "fixed bottom-6 right-6 z-[80] rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-lg"
-          }
-        >
-          {domainToast.message}
-        </div>
-      ) : null}
+      <ToastNotification
+        message={domainToast?.message ?? null}
+        tone={domainToast?.tone}
+        onDismiss={() => setDomainToast(null)}
+      />
 
       <div className="flex flex-col gap-2">
         <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
@@ -502,6 +510,35 @@ export default function OverviewPage() {
         </Card>
       ) : null}
 
+      {hasPageLevelError && !workspaceAccessBlocked ? (
+        <Card className="border border-rose-200 bg-rose-50 text-rose-950 shadow-sm">
+          <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-3">
+              <div className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                <ShieldAlert className="size-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold">
+                  {pageLevelErrorMessage?.includes("temporarily unreachable")
+                    ? "API temporarily unreachable"
+                    : "Unable to load dashboard data"}
+                </div>
+                <div className="mt-1 max-w-3xl text-sm text-rose-900/80">
+                  {pageLevelErrorMessage}
+                </div>
+              </div>
+            </div>
+            <Button
+              className="w-full sm:w-auto"
+              variant="outline"
+              onClick={retryAll}
+            >
+              Retry all
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {usage.data?.mode === "PASSTHROUGH" ? (
         <Card className="border border-rose-200 bg-rose-50 text-rose-950">
           <CardContent className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -513,7 +550,9 @@ export default function OverviewPage() {
                 returns.
               </div>
             </div>
-            <Button className="w-full sm:w-auto">Upgrade Plan</Button>
+            <Button asChild className="w-full sm:w-auto">
+              <a href="https://memoryo.dev/pricing" target="_blank" rel="noreferrer">Upgrade Plan</a>
+            </Button>
           </CardContent>
         </Card>
       ) : null}
