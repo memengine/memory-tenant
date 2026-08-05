@@ -5,6 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import useSWR from "swr";
 import { BellRing, CheckCircle, DollarSign, Loader2, ShieldCheck, Zap } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MetricCard } from "@/components/metric-card";
 import { SettingsForm } from "@/components/settings-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,6 +93,7 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(null);
   const [switchingDomain, setSwitchingDomain] = useState<DomainSchemaValue | "general-pending" | null>(null);
   const [savingSupportType, setSavingSupportType] = useState(false);
+  const [pendingDomain, setPendingDomain] = useState<DomainSchemaValue | "general-pending" | null>(null);
   const domain = useDomainSchema();
 
   const usage = useSWR(
@@ -130,18 +132,12 @@ export default function SettingsPage() {
     if (nextDomain === domain.domainSchema) {
       return;
     }
+    setPendingDomain(nextDomain ?? "general-pending");
+  }
 
-    const confirmed = window.confirm(
-      nextDomain === "edtech"
-        ? "Enable EdTech Schema?\n\nFuture add() calls will extract structured student memory. Existing general memories are kept - new sessions use EdTech extraction."
-        : nextDomain === "support"
-          ? "Enable Customer Support Schema?\n\nFuture add() calls will extract structured customer support memory. Existing general memories are kept."
-          : "Switch to General Engine?\n\nYour existing domain memories will be kept but new add() calls will use general extraction. You can switch back anytime.",
-    );
-    if (!confirmed) {
-      return;
-    }
-
+  async function confirmDomainSwitch() {
+    const nextDomain = pendingDomain === "general-pending" ? null : pendingDomain as DomainSchemaValue;
+    setPendingDomain(null);
     setSwitchingDomain(nextDomain ?? "general-pending");
     setSaveStatus(null);
     try {
@@ -220,6 +216,20 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6 pt-14 md:pt-0">
+      <ConfirmDialog
+        open={pendingDomain !== null}
+        title="Change domain schema?"
+        description={
+          pendingDomain === "edtech"
+            ? "Enable EdTech Schema?\n\nFuture add() calls will extract structured student memory. Existing general memories are kept — new sessions use EdTech extraction."
+            : pendingDomain === "support"
+              ? "Enable Customer Support Schema?\n\nFuture add() calls will extract structured customer support memory. Existing general memories are kept."
+              : "Switch to General Engine?\n\nYour existing domain memories will be kept but new add() calls will use general extraction. You can switch back anytime."
+        }
+        confirmLabel="Yes, switch"
+        onConfirm={() => void confirmDomainSwitch()}
+        onCancel={() => setPendingDomain(null)}
+      />
       <div className="space-y-2">
         <span className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
           Settings
