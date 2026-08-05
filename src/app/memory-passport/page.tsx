@@ -18,6 +18,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   createGlobalAgent,
   createPassportLinkToken,
   displayApiError,
@@ -252,9 +259,15 @@ export default function MemoryPassportPage() {
       </section>
 
       {message ? (
-        <Card className="border border-slate-200 bg-white">
-          <CardContent className="py-4 text-sm text-slate-700">{message}</CardContent>
-        </Card>
+        <div
+          className={
+            message.startsWith("Unable") || message.startsWith("Agent name")
+              ? "rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800"
+              : "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900"
+          }
+        >
+          {message}
+        </div>
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -365,9 +378,21 @@ export default function MemoryPassportPage() {
 
               <label className="space-y-2">
                 <span className="text-sm font-medium text-slate-700">Agent</span>
-                <select value={selectedAgent?.id ?? ""} onChange={(event) => setSelectedAgentId(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800">
-                  {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-                </select>
+                <Select
+                  value={selectedAgent?.id ?? ""}
+                  onValueChange={(value) => setSelectedAgentId(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agents.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
 
               {selectedAgent ? (
