@@ -8,6 +8,7 @@ import { KeyRound, ShieldCheck, TimerReset, Trash2 } from "lucide-react";
 import { CreateKeyDialog } from "@/components/create-key-dialog";
 import { MetricCard } from "@/components/metric-card";
 import { RevealKeyDialog } from "@/components/reveal-key-dialog";
+import { ToastNotification } from "@/components/toast-notification";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -103,8 +104,7 @@ export default function ApiKeysPage() {
   const [revealOpen, setRevealOpen] = useState(false);
   const [pendingRevoke, setPendingRevoke] = useState<ApiKeyData | null>(null);
   const [busyAction, setBusyAction] = useState<"create" | "revoke" | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [rawKey, setRawKey] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<{ text: string; tone: "success" | "error" } | null>(null);  const [rawKey, setRawKey] = useState<string | null>(null);
   const [revealedPrefixes, setRevealedPrefixes] = useState<Record<string, string>>({});
 
   const apiKeys = useSWR<ApiKeysPayload>(
@@ -147,7 +147,7 @@ export default function ApiKeysPage() {
       setCreateOpen(false);
       setRevealOpen(true);
     } catch (error) {
-      setSaveMessage(displayApiError(error) ?? "Unable to create API key.");
+      setSaveMessage({ text: displayApiError(error) ?? "Unable to create API key.", tone: "error" });
     } finally {
       setBusyAction(null);
     }
@@ -163,9 +163,9 @@ export default function ApiKeysPage() {
       await revokeApiKey(getToken, pendingRevoke.id);
       setPendingRevoke(null);
       await apiKeys.mutate();
-      setSaveMessage("API key revoked.");
+      setSaveMessage({ text: "API key revoked.", tone: "success" });
     } catch (error) {
-      setSaveMessage(displayApiError(error) ?? "Unable to revoke API key.");
+      setSaveMessage({ text: displayApiError(error) ?? "Unable to revoke API key.", tone: "error" });
     } finally {
       setBusyAction(null);
     }
@@ -185,11 +185,11 @@ export default function ApiKeysPage() {
         </p>
       </div>
 
-      {saveMessage ? (
-        <Card className="border border-slate-200 bg-slate-50">
-          <CardContent className="py-4 text-sm text-slate-700">{saveMessage}</CardContent>
-        </Card>
-      ) : null}
+      <ToastNotification
+        message={saveMessage?.text ?? null}
+        tone={saveMessage?.tone}
+        onDismiss={() => setSaveMessage(null)}
+      />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
