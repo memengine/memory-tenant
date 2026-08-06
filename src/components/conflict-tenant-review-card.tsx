@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Info, UserCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { SharedContextConflict } from "@/lib/api";
 
 function truncateUserId(value?: string | null) {
@@ -58,18 +60,6 @@ function formatRelativeTime(value?: string | null) {
   return `${days}d ago`;
 }
 
-function confirmArchive({
-  kept,
-  archived,
-}: {
-  kept: string;
-  archived: string;
-}) {
-  return window.confirm(
-    `Confirm: ${kept}\n\nis the current organisational truth?\n\n${archived}\n\nwill be archived.`,
-  );
-}
-
 export function ConflictTenantReviewCard({
   conflict,
   busy,
@@ -79,6 +69,12 @@ export function ConflictTenantReviewCard({
   busy: boolean;
   onResolve: (correctUser: "A" | "B" | "both_valid") => void;
 }) {
+  const [pendingResolve, setPendingResolve] = useState<{
+    winner: "A" | "B";
+    kept: string;
+    archived: string;
+  } | null>(null);
+
   const userA = truncateUserId(conflict.user_a_id);
   const userB = truncateUserId(conflict.user_b_id);
   const sameUser =
@@ -91,6 +87,23 @@ export function ConflictTenantReviewCard({
   return (
     <Card className="border-amber-200 bg-white" id={`conflict-${conflict.id}`}>
       <CardContent className="space-y-5 p-5">
+        <ConfirmDialog
+          open={pendingResolve !== null}
+          title="Confirm resolution"
+          description={
+            pendingResolve
+              ? `"${pendingResolve.kept}"\n\nwill be set as the current organisational truth.\n\n"${pendingResolve.archived}"\n\nwill be archived.`
+              : ""
+          }
+          confirmLabel="Yes, archive the other"
+          onConfirm={() => {
+            if (pendingResolve) {
+              onResolve(pendingResolve.winner);
+              setPendingResolve(null);
+            }
+          }}
+          onCancel={() => setPendingResolve(null)}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
@@ -163,11 +176,7 @@ export function ConflictTenantReviewCard({
             variant="outline"
             disabled={busy}
             className="border-sky-200 text-sky-800"
-            onClick={() => {
-              if (confirmArchive({ kept: memoryA, archived: memoryB })) {
-                onResolve("A");
-              }
-            }}
+            onClick={() => setPendingResolve({ winner: "A", kept: memoryA, archived: memoryB })}
           >
             {sameUser ? `${sourceA} is correct` : `${userA}'s version is current`}
           </Button>
@@ -176,11 +185,7 @@ export function ConflictTenantReviewCard({
             variant="outline"
             disabled={busy}
             className="border-sky-200 text-sky-800"
-            onClick={() => {
-              if (confirmArchive({ kept: memoryB, archived: memoryA })) {
-                onResolve("B");
-              }
-            }}
+            onClick={() => setPendingResolve({ winner: "B", kept: memoryB, archived: memoryA })}
           >
             {sameUser ? `${sourceB} is correct` : `${userB}'s version is current`}
           </Button>
