@@ -182,7 +182,7 @@ function AgentPicker({ agents, selectedAgentId, onSelect }: { agents: GlobalAgen
 }
 
 export default function StudioPage() {
-  const { getToken } = useAuth();
+  const { isLoaded, getToken } = useAuth();
   const [activeStep, setActiveStep] = useState<StudioStep>("agent");
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<MemoryCategory[]>(defaultCategories);
@@ -193,7 +193,11 @@ export default function StudioPage() {
   const [connectorError, setConnectorError] = useState<string | null>(null);
   const [creatingConnector, setCreatingConnector] = useState(false);
 
-  const agentsQuery = useSWR("studio-global-agents", () => listGlobalAgents(getToken), { refreshInterval: 60000 });
+  const agentsQuery = useSWR(
+    isLoaded ? "studio-global-agents" : null,
+    () => listGlobalAgents(getToken),
+    { refreshInterval: 60000 },
+  );
   const agents = agentsQuery.data ?? [];
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) ?? agents[0], [agents, selectedAgentId]);
   const activeIndex = studioSteps.find((step) => step.id === activeStep)?.index ?? 1;
@@ -435,7 +439,7 @@ await mem.add(
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-white p-4 text-sm leading-6 text-emerald-950">In production, do not type user IDs manually. The ID comes from your own session, for example <code className="rounded bg-emerald-100 px-1">session.user.id</code>.</div>
               <div className="mt-4"><label className="text-sm font-medium text-slate-700">Test user ID in your app</label><Input value={externalUserId} onChange={(event) => setExternalUserId(event.target.value)} className="mt-1 bg-white" /><p className="mt-1 text-xs text-slate-500">Use a stable internal ID like customer_123, not a raw email.</p></div>
               <Button className="mt-4" onClick={() => void createConnector()} disabled={creatingConnector || !selectedAgent || !externalUserId.trim()}>{creatingConnector ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}Create real connector link</Button>
-              {connectorError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-700">{connectorError}</div> : null}
+              {connectorError ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-800">{connectorError}</div> : null}
               {connectorUrl ? <div className="mt-4 space-y-3"><UrlBox value={connectorUrl} fallback="" /><div className="flex flex-wrap gap-2"><Button onClick={() => void copyText(connectorUrl)}><Copy className="size-4" />Copy connector link</Button><Button asChild variant="outline"><a href={connectorUrl} target="_blank" rel="noreferrer">Test link<ExternalLink className="size-4" /></a></Button></div><p className="text-xs text-slate-500">Single-use link. Create a fresh one each time a signed-in user starts the connection flow.</p></div> : null}
             </div>
             <div className="space-y-4">
