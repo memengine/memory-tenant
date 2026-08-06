@@ -2,6 +2,8 @@
 
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { mutate } from "swr";
 
 import { Sidebar } from "@/components/sidebar";
 
@@ -17,6 +19,18 @@ function WorkspaceNotice() {
 
 function WorkspaceNoticeInner() {
   const { organization } = useOrganization();
+
+  // When the active org changes (including first selection after creation),
+  // revalidate all SWR keys so every page refetches with the new org token.
+  const prevOrgId = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    const nextId = organization?.id ?? null;
+    if (prevOrgId.current !== undefined && prevOrgId.current !== nextId) {
+      // Broadcast revalidation to all mounted SWR hooks
+      void mutate(() => true, undefined, { revalidate: true });
+    }
+    prevOrgId.current = nextId;
+  }, [organization?.id]);
 
   if (organization) {
     return null;
@@ -50,3 +64,4 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
