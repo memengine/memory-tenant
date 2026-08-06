@@ -77,6 +77,7 @@ export default function UserDetailPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -137,9 +138,14 @@ export default function UserDetailPage() {
       return;
     }
     setDeletingAll(true);
+    setDeleteError(null);
     try {
       await deleteTenantUser(getToken, externalUserId);
       router.push("/users");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to delete user. Please try again.";
+      setDeleteError(message);
     } finally {
       setDeletingAll(false);
     }
@@ -390,6 +396,11 @@ export default function UserDetailPage() {
             />
             <span>I have exported or do not need the data</span>
           </label>
+          {deleteError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              {deleteError}
+            </div>
+          ) : null}
           <DialogFooter showCloseButton>
             <Button
               variant="destructive"
