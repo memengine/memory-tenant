@@ -139,9 +139,16 @@ export default function UsersPage() {
     };
   }, [filteredUsers]);
 
+  const [blockError, setBlockError] = useState<string | null>(null);
+
   async function handleBlockUser(externalUserId: string) {
-    await blockTenantUser(getToken, externalUserId);
-    await users.mutate();
+    setBlockError(null);
+    try {
+      await blockTenantUser(getToken, externalUserId);
+      await users.mutate();
+    } catch (error) {
+      setBlockError(displayApiError(error) ?? "Failed to block user. Please try again.");
+    }
   }
 
   async function handleExportCsv() {
@@ -223,6 +230,12 @@ export default function UsersPage() {
           onRetry={() => void users.mutate()}
         />
       </section>
+
+      {blockError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+          {blockError}
+        </div>
+      ) : null}
 
       <Card>
         <CardContent className="space-y-4 pt-6">
