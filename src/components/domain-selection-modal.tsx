@@ -71,11 +71,11 @@ function OptionCard({
           {borderLabel}
         </div>
       ) : null}
-      <CardContent className="space-y-5 p-6">
-        <div className="flex items-start gap-4">
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-start gap-3">
           <div
             className={cn(
-              "flex size-12 items-center justify-center rounded-2xl text-2xl",
+              "flex size-9 shrink-0 items-center justify-center rounded-xl text-lg",
               accent === "blue" ? "bg-sky-100" : accent === "amber" ? "bg-amber-100" : "bg-slate-100",
             )}
             aria-hidden
@@ -83,10 +83,10 @@ function OptionCard({
             {icon}
           </div>
           <div className="min-w-0">
-            <h3 className="text-xl font-semibold text-slate-950">{title}</h3>
+            <h3 className="text-base font-semibold text-slate-950">{title}</h3>
             <div
               className={cn(
-                "mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+                "mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
                 accent === "blue"
                   ? "bg-sky-100 text-sky-700"
                   : accent === "amber"
@@ -99,18 +99,18 @@ function OptionCard({
           </div>
         </div>
 
-        <p className="text-sm leading-6 text-slate-600">{description}</p>
+        <p className="text-xs leading-5 text-slate-600">{description}</p>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
             Best for
           </div>
-          <p className="mt-2 text-sm text-slate-700">{bestFor}</p>
+          <p className="mt-1 text-xs text-slate-600">{bestFor}</p>
         </div>
 
         <div
           className={cn(
-            "space-y-2 rounded-2xl p-4 text-sm",
+            "space-y-1.5 rounded-xl px-3 py-2.5 text-xs",
             accent === "blue"
               ? "bg-sky-50 text-sky-900"
               : accent === "amber"
@@ -119,8 +119,8 @@ function OptionCard({
           )}
         >
           {preview.map((item) => (
-            <div key={item} className="flex items-center gap-2">
-              <CheckCircle className="size-3.5 shrink-0" />
+            <div key={item} className="flex items-center gap-1.5">
+              <CheckCircle className="size-3 shrink-0" />
               <span>{item}</span>
             </div>
           ))}
@@ -128,11 +128,12 @@ function OptionCard({
 
         <Button
           className="w-full"
+          size="sm"
           variant={accent === "gray" ? "outline" : "default"}
           onClick={onClick}
           disabled={disabled || loading}
         >
-          {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+          {loading ? <Loader2 className="mr-2 size-3.5 animate-spin" /> : null}
           {cta}
         </Button>
       </CardContent>
@@ -218,24 +219,19 @@ export function DomainSelectionModal({
     <div
       aria-modal="true"
       role="dialog"
-      className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/30 p-4 backdrop-blur-md sm:p-8"
+      className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/30 p-4 backdrop-blur-md sm:p-6"
     >
-      <div className="mx-auto max-w-6xl rounded-[2rem] border border-white/70 bg-white/95 p-5 shadow-2xl sm:p-8">
-        <header className="space-y-3 text-center">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            <img
-              src="/brand/logo-mark.svg"
-              alt="MemoryOS"
-              className="size-10"
-            />
+      <div className="mx-auto max-w-4xl rounded-2xl border border-white/70 bg-white/95 p-5 shadow-2xl sm:p-6">
+        <header className="space-y-2 text-center">
+          <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <img src="/brand/logo-mark.svg" alt="MemoryOS" className="size-7" />
           </div>
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-slate-950">
+            <h2 className="text-xl font-semibold tracking-tight text-slate-950">
               What are you building?
             </h2>
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-              Choose how MemoryOS structures memory for your AI product. You can
-              change this later in Settings.
+            <p className="mx-auto mt-1 max-w-xl text-xs leading-5 text-slate-500">
+              Choose how MemoryOS structures memory for your AI product. You can change this later in Settings.
             </p>
           </div>
         </header>
@@ -243,7 +239,7 @@ export function DomainSelectionModal({
         {notice ? (
           <div
             className={cn(
-              "mx-auto mt-5 max-w-2xl rounded-2xl border px-4 py-3 text-sm",
+              "mx-auto mt-4 max-w-2xl rounded-xl border px-3 py-2 text-xs",
               notice.tone === "error"
                 ? "border-rose-200 bg-rose-50 text-rose-800"
                 : notice.tone === "success"
@@ -255,7 +251,7 @@ export function DomainSelectionModal({
           </div>
         ) : null}
 
-        <section className="mt-8 grid gap-5 lg:grid-cols-3">
+        <section className="mt-5 grid gap-3 lg:grid-cols-3">
           <OptionCard
             accent="gray"
             icon="⚙️"
@@ -310,43 +306,38 @@ export function DomainSelectionModal({
           />
         </section>
 
-        <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <section className="mt-4 grid gap-2 sm:grid-cols-3">
           {comingSoonDomains.map((domain) => (
             <button
               key={domain.name}
               type="button"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left opacity-75 transition hover:bg-slate-100"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-left opacity-70 transition hover:bg-slate-100"
               onClick={() => comingSoon(domain.name)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <span className="text-2xl" aria-hidden>
-                  {domain.icon}
-                </span>
-                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  Coming Soon
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base" aria-hidden>{domain.icon}</span>
+                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                  Soon
                 </span>
               </div>
-              <div className="mt-3 font-semibold text-slate-800">{domain.name}</div>
-              <p className="mt-1 text-sm leading-5 text-slate-500">{domain.description}</p>
+              <div className="mt-1.5 text-xs font-semibold text-slate-700">{domain.name}</div>
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-400">{domain.description}</p>
             </button>
           ))}
         </section>
 
-        <footer className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-sm text-slate-500 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-sky-600" />
+        <footer className="mt-5 flex flex-col items-center justify-between gap-2 border-t border-slate-200 pt-4 text-xs text-slate-500 sm:flex-row">
+          <div className="flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-sky-600" />
             Not sure? Start with General Engine. You can switch anytime.
           </div>
           <button
             type="button"
-            className="inline-flex items-center gap-2 font-medium text-slate-600 underline-offset-4 hover:text-slate-950 hover:underline"
-            onClick={() => {
-              markCompleted();
-              onClose();
-            }}
+            className="inline-flex items-center gap-1.5 font-medium text-slate-600 underline-offset-4 hover:text-slate-950 hover:underline"
+            onClick={() => { markCompleted(); onClose(); }}
           >
-            <Clock className="size-4" />
-            Skip for now -&gt;
+            <Clock className="size-3.5" />
+            Skip for now
           </button>
         </footer>
       </div>
