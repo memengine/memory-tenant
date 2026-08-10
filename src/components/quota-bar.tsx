@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/card";
 import type { QuotaMode } from "@/lib/api";
 
+const UPGRADE_URL = "https://memoryo.dev/pricing";
+
 function getQuotaTone(percentUsed: number) {
   if (percentUsed > 85) {
     return "bg-rose-500";
@@ -88,7 +90,9 @@ export function QuotaBar({
                     quota window to reset.
                   </div>
                 </div>
-                <Button className="w-full sm:w-auto">Upgrade Plan</Button>
+                <Button asChild className="w-full sm:w-auto">
+                  <a href={UPGRADE_URL} target="_blank" rel="noreferrer">Upgrade Plan</a>
+                </Button>
               </div>
             ) : null}
 
