@@ -42,13 +42,12 @@ export function MetricCard({
             <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
           </div>
         ) : error ? (
-          <div className="space-y-3">
-            <div className="text-sm font-medium leading-6 text-rose-700">{error}</div>
-            {onRetry ? (
-              <Button variant="outline" size="sm" onClick={onRetry}>
-                Retry
-              </Button>
-            ) : null}
+          // Error text is shown in a page-level banner; card shows a neutral dash.
+          <div className="space-y-2">
+            <div className="text-3xl font-semibold tracking-tight text-slate-400">
+              —
+            </div>
+            <p className="text-sm text-slate-400">{description}</p>
           </div>
         ) : (
           <div className="space-y-2">
