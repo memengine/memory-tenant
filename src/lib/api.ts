@@ -1,17 +1,25 @@
-export type TokenGetter = (options?: { template?: string }) => Promise<string | null>;
+export type TokenGetter = (options?: {
+  template?: string;
+  skipCache?: boolean;
+}) => Promise<string | null>;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 const CLERK_JWT_TEMPLATE = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE;
 
 export async function getDashboardToken(getToken: TokenGetter): Promise<string | null> {
   if (CLERK_JWT_TEMPLATE) {
-    const templatedToken = await getToken({ template: CLERK_JWT_TEMPLATE });
+    // skipCache: true ensures we always get a fresh token with the current
+    // active org_id — critical after org creation or switching workspaces.
+    const templatedToken = await getToken({
+      template: CLERK_JWT_TEMPLATE,
+      skipCache: true,
+    });
     if (templatedToken) {
       return templatedToken;
     }
   }
 
-  return getToken();
+  return getToken({ skipCache: true });
 }
 
 export class ApiRequestError extends Error {
@@ -32,6 +40,9 @@ export function displayApiError(error: unknown): string | undefined {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
 
+  if (message === "org_required" || message === "AUTH_003") {
+    return "No workspace selected. Please select or create a workspace from the sidebar.";
+  }
   if (message === "tenant_auth_required" || message === "unauthorized") {
     return "Workspace access is not ready yet. Refresh once after creating or switching workspaces.";
   }
@@ -41,13 +52,17 @@ export function displayApiError(error: unknown): string | undefined {
   if (
     normalized.includes("clerkjs") ||
     normalized.includes("clerk:") ||
-    normalized.includes("clerk.accounts") ||
+    normalized.includes("clerk.accounts")
+  ) {
+    return "Authentication service is unreachable. Check your internet connection and try again.";
+  }
+  if (
     normalized.includes("failed to fetch") ||
     normalized.includes("networkerror") ||
     normalized.includes("network error") ||
     normalized.includes("load failed")
   ) {
-    return "Connection issue. Check your internet connection and try again.";
+    return "The MemoryOS API is temporarily unreachable. Your data is safe — please try again in a moment.";
   }
   if (normalized.includes("jwt") || normalized.includes("token") || normalized.includes("session")) {
     return "Your session could not be refreshed. Sign in again if retry does not work.";
@@ -72,6 +87,8 @@ export function isWorkspaceAccessError(error: unknown): boolean {
     status === 401 ||
     status === 403 ||
     normalized === "unauthorized" ||
+    normalized === "org_required" ||
+    normalized === "auth_003" ||
     normalized === "tenant_auth_required" ||
     normalized === "tenant_not_found" ||
     normalized.includes("session") ||
@@ -536,7 +553,13 @@ export type AddMemoriesRequest = {
   external_user_id: string;
   messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   agent_id?: string | null;
-  source?: Record<string, unknown>;
+  source?: {
+    service?: string;
+    event_id?: string;
+    observed_at?: string;
+    scope?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
   metadata?: Record<string, unknown>;
 };
 
