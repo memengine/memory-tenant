@@ -7,6 +7,7 @@ import type { TenantSettings, TenantUsage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ToastNotification } from "@/components/toast-notification";
 
 type SaveStatus = {
   tone: "success" | "error";
@@ -47,7 +48,7 @@ export function SettingsForm({
   onSave,
   onTestWebhook,
 }: SettingsFormProps) {
-  const upgradeUrl = process.env.NEXT_PUBLIC_UPGRADE_URL;
+  const upgradeUrl = process.env.NEXT_PUBLIC_UPGRADE_URL ?? "https://memoryo.dev/pricing";
   const [webhookUrl, setWebhookUrl] = useState("");
   const [overagePolicy, setOveragePolicy] = useState<TenantSettings["overage_policy"]>("warn");
   const [alertThreshold, setAlertThreshold] = useState(80);
@@ -58,6 +59,20 @@ export function SettingsForm({
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>(null);
+  const [webhookUrlError, setWebhookUrlError] = useState<string | null>(null);
+
+  function validateWebhookUrl(value: string): string | null {
+    if (!value.trim()) return null; // empty is allowed (clears the webhook)
+    try {
+      const url = new URL(value.trim());
+      if (url.protocol !== "https:") {
+        return "Webhook URL must use HTTPS.";
+      }
+      return null;
+    } catch {
+      return "Webhook URL is not a valid URL.";
+    }
+  }
 
   useEffect(() => {
     const storedThreshold = window.localStorage.getItem("memoryos:tenant:alert-threshold");
@@ -77,6 +92,12 @@ export function SettingsForm({
   }, [usage]);
 
   async function handleSave() {
+    const urlValidationError = validateWebhookUrl(webhookUrl);
+    if (urlValidationError) {
+      setWebhookUrlError(urlValidationError);
+      return;
+    }
+    setWebhookUrlError(null);
     setSaving(true);
     setWebhookStatus(null);
     onSaveStatusClear();
@@ -106,6 +127,16 @@ export function SettingsForm({
   }
 
   async function handleTestWebhook() {
+    const urlValidationError = validateWebhookUrl(webhookUrl);
+    if (urlValidationError) {
+      setWebhookUrlError(urlValidationError);
+      return;
+    }
+    if (!webhookUrl.trim()) {
+      setWebhookStatus({ tone: "error", message: "Enter a webhook URL first." });
+      return;
+    }
+    setWebhookUrlError(null);
     setTesting(true);
     setWebhookStatus(null);
     try {
@@ -151,14 +182,21 @@ export function SettingsForm({
             <div className="flex flex-col gap-3 sm:flex-row">
               <Input
                 value={webhookUrl}
-                onChange={(event) => setWebhookUrl(event.target.value)}
+                onChange={(event) => {
+                  setWebhookUrl(event.target.value);
+                  setWebhookUrlError(null);
+                }}
                 placeholder="https://example.com/webhooks/memoryos"
+                aria-invalid={Boolean(webhookUrlError)}
               />
               <Button variant="outline" onClick={() => void handleTestWebhook()} disabled={testing}>
                 <Link2 className="mr-2 size-4" />
                 {testing ? "Testing..." : "Test Delivery"}
               </Button>
             </div>
+            {webhookUrlError ? (
+              <div className="text-sm text-rose-700">{webhookUrlError}</div>
+            ) : null}
             {webhookStatus ? (
               <div
                 className={
@@ -234,17 +272,11 @@ export function SettingsForm({
         </CardContent>
       </Card>
 
-      {saveStatus ? (
-        <div
-          className={
-            saveStatus.tone === "success"
-              ? "fixed bottom-6 right-6 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 shadow-lg"
-              : "fixed bottom-6 right-6 z-50 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 shadow-lg"
-          }
-        >
-          {saveStatus.message}
-        </div>
-      ) : null}
+      <ToastNotification
+        message={saveStatus?.message ?? null}
+        tone={saveStatus?.tone}
+        onDismiss={onSaveStatusClear}
+      />
 
       <Card>
         <CardHeader>
@@ -280,18 +312,12 @@ export function SettingsForm({
             </div>
           </div>
 
-          {upgradeUrl ? (
-            <Button asChild className="w-full">
-              <a href={upgradeUrl} target="_blank" rel="noreferrer">
-                Upgrade Plan
-                <ExternalLink className="ml-2 size-4" />
-              </a>
-            </Button>
-          ) : (
-            <Button className="w-full" disabled>
-              Upgrade Plan unavailable
-            </Button>
-          )}
+          <Button asChild className="w-full">
+            <a href={upgradeUrl} target="_blank" rel="noreferrer">
+              Upgrade Plan
+              <ExternalLink className="ml-2 size-4" />
+            </a>
+          </Button>
         </CardContent>
       </Card>
     </div>
