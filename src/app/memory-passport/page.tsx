@@ -6,7 +6,6 @@ import useSWR from "swr";
 import {
   CheckCircle2,
   Copy,
-  Fingerprint,
   Info,
   Link2,
   Plus,
