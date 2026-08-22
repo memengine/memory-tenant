@@ -1,6 +1,7 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import { AuthMemoryAnimation } from "@/components/auth-memory-animation";
+import { AuthLiquidArtwork } from "@/components/auth-liquid-artwork";
 
 type AuthShellProps = {
   children: React.ReactNode;
@@ -9,8 +10,8 @@ type AuthShellProps = {
 
 export const authAppearance = {
   variables: {
-    colorPrimary: "#67e8f9",
-    colorBackground: "#0a111d",
+    colorPrimary: "#f8fafc",
+    colorBackground: "#0a0a0b",
     colorInputBackground: "#e8eef7",
     colorInputText: "#0f172a",
     colorText: "#f8fafc",
@@ -31,31 +32,31 @@ export const authAppearance = {
     headerTitle: "hidden",
     headerSubtitle: "hidden",
     socialButtonsBlockButton:
-      "!h-9 !rounded-xl !border !border-white/15 !bg-white/[0.03] !text-white !shadow-none transition hover:!border-cyan-200/35 hover:!bg-white/[0.06]",
+      "!h-12 !rounded-full !border !border-white/10 !bg-white/[0.06] !text-white !shadow-none transition hover:!border-white/20 hover:!bg-white/[0.1]",
     socialButtonsBlockButtonText: "!font-semibold !text-slate-200",
     formFieldInput:
-      "!h-9 !rounded-xl !border !border-slate-300/70 !bg-[#e8eef7] !px-4 !text-[#0f172a] placeholder:!text-slate-500 !shadow-none !outline-none focus:!border-cyan-400 focus:!ring-2 focus:!ring-cyan-300/15",
+      "!h-12 !rounded-full !border !border-white/15 !bg-white/[0.04] !px-5 !text-white placeholder:!text-slate-500 !shadow-none !outline-none focus:!border-white/35 focus:!ring-4 focus:!ring-white/[0.04]",
     formButtonPrimary:
-      "!h-9 !rounded-xl !bg-white !font-black !text-[#07111d] !shadow-none transition hover:!bg-cyan-50",
+      "!h-12 !rounded-full !bg-white !font-black !text-black !shadow-none transition hover:!bg-slate-200",
     footer: "!mt-4 !bg-transparent",
     footerPages: "hidden",
     footerPageLink: "hidden",
     footerAction: "!border-t !border-white/10 !pt-3.5",
     footerActionText: "!text-xs !text-slate-400",
     footerActionLink:
-      "!text-xs !font-bold !text-cyan-300 hover:!text-cyan-200",
+      "!text-xs !font-bold !text-white hover:!text-slate-300",
     developmentModeBadge: "hidden",
     dividerLine: "!bg-white/10",
     dividerText: "!text-slate-500",
     formFieldLabel: "!text-xs !font-semibold !text-slate-300",
     formFieldInputShowPasswordButton: "!text-slate-500 hover:!text-slate-200",
-    formFieldAction: "!text-cyan-300 hover:!text-cyan-200",
+    formFieldAction: "!text-white hover:!text-slate-300",
     formFieldSuccessText: "!text-emerald-300",
     formFieldErrorText: "!text-rose-300",
     alert: "!rounded-xl !border !border-rose-400/20 !bg-rose-400/10 !text-rose-200",
-    formResendCodeLink: "!text-cyan-300 hover:!text-cyan-200",
+    formResendCodeLink: "!text-white hover:!text-slate-300",
     otpCodeFieldInput:
-      "!h-9 !rounded-xl !border !border-white/15 !bg-[#111a28] !text-white",
+      "!h-12 !rounded-full !border !border-white/15 !bg-white/[0.04] !text-white",
     identityPreviewText: "!text-white",
   },
 };
@@ -64,51 +65,41 @@ export function AuthShell({ children, mode }: AuthShellProps) {
   const isSignUp = mode === "sign-up";
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-black text-white lg:h-dvh lg:min-h-0 lg:overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 bg-black" />
+    <main className="min-h-screen bg-black p-2 text-white lg:h-dvh lg:overflow-hidden">
+      <div className="mx-auto grid min-h-[calc(100vh-1rem)] max-w-[1900px] overflow-hidden rounded-[1.75rem] border border-white/10 bg-black shadow-[0_24px_90px_rgba(0,0,0,0.35)] lg:h-[calc(100vh-1rem)] lg:grid-cols-2">
+        <div className="hidden min-h-0 p-0 lg:block">
+          <AuthLiquidArtwork />
+        </div>
 
-      <div className="relative mx-auto grid min-h-screen max-w-[1480px] lg:h-full lg:min-h-0 lg:grid-cols-[0.82fr_1.18fr]">
-        <section className="relative flex min-h-screen flex-col border-white/10 px-5 py-5 sm:px-8 lg:h-full lg:min-h-0 lg:border-r lg:px-10 lg:py-6">
+        <section className="relative flex min-h-[calc(100vh-1rem)] items-center justify-center border-white/10 bg-[#050506] px-6 py-20 sm:px-10 lg:min-h-0 lg:border-l lg:px-16">
           <Link
             href="https://memoryo.dev"
-            className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:border-white/20 hover:text-white"
+            className="absolute left-6 top-6 inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-white"
           >
             <ArrowLeft className="size-4" />
             Back to MemoryOS
           </Link>
 
-          <div className="flex min-h-0 flex-1 items-center justify-center py-6 lg:py-2">
-            <div className="w-full max-w-[374px] text-center">
-              <div className="mx-auto flex w-fit items-center gap-2.5 text-sm font-black tracking-tight text-white">
-                <span className="flex size-9 items-center justify-center rounded-xl bg-white">
-                  <img src="/brand/logo-mark.svg" alt="" className="size-6" />
-                </span>
-                MemoryOS
-                <span className="rounded-full border border-cyan-300/20 bg-cyan-300/[0.07] px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] text-cyan-200">
-                  Private beta
-                </span>
-              </div>
-
-              <h1 className="mt-4 text-3xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-[2.15rem]">
+          <div className="w-full max-w-[400px] text-center">
+              <span className="mx-auto flex size-12 items-center justify-center rounded-2xl border border-white/10 bg-white shadow-sm">
+                <Image src="/brand/logo-mark.svg" alt="" width={30} height={30} />
+              </span>
+              <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">MemoryOS private beta</p>
+              <h1 className="mt-3 text-4xl font-semibold leading-[1.05] tracking-[-0.045em]">
                 {isSignUp
-                  ? "Join the MemoryOS private beta"
-                  : "Access the MemoryOS private beta"}
+                  ? "Request access"
+                  : "Welcome back"}
               </h1>
-              <p className="mx-auto mt-2.5 max-w-sm text-sm leading-5 text-slate-400">
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-500">
                 {isSignUp
                   ? "Request access now. We’ll invite you when your workspace is ready."
-                  : "Sign in if you’re approved, or join the waitlist for access."}
+                  : "Sign in to your governed memory workspace."}
               </p>
 
-              <div className="memoryos-auth-card mx-auto mt-4 overflow-hidden rounded-[1.4rem] border border-white/10 bg-[#0a111d] p-4 text-left text-white shadow-2xl shadow-black/20">
+              <div className="memoryos-auth-card mx-auto mt-8 text-left text-white">
                 {children}
               </div>
-            </div>
           </div>
-        </section>
-
-        <section className="relative hidden h-full min-h-0 overflow-hidden bg-black p-5 lg:block xl:p-7">
-          <AuthMemoryAnimation />
         </section>
       </div>
     </main>
