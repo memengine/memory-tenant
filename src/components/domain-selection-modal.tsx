@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { CheckCircle, Clock, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -224,7 +225,7 @@ export function DomainSelectionModal({
       <div className="mx-auto max-w-4xl rounded-2xl border border-white/70 bg-white/95 p-5 shadow-2xl sm:p-6">
         <header className="space-y-2 text-center">
           <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-            <img src="/brand/logo-mark.svg" alt="MemoryOS" className="size-7" />
+            <Image src="/brand/logo-mark.svg" alt="MemoryOS" width={28} height={28} />
           </div>
           <div>
             <h2 className="text-xl font-semibold tracking-tight text-slate-950">
