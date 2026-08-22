@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { OrganizationSwitcher, UserButton, useAuth } from "@clerk/nextjs";
 import {
@@ -78,10 +79,12 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
         compact ? "size-9" : "size-11",
       )}
     >
-      <img
+      <Image
         src="/brand/logo-mark.svg"
         alt=""
         aria-hidden="true"
+        width={32}
+        height={32}
         className={compact ? "size-6" : "size-8"}
       />
     </div>

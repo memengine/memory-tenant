@@ -20,17 +20,20 @@ export function ToastNotification({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (!message) {
-      setVisible(false);
-      return;
+    const visibilityFrame = window.requestAnimationFrame(() => {
+      setVisible(Boolean(message));
+    });
+    if (!message || duration <= 0) {
+      return () => window.cancelAnimationFrame(visibilityFrame);
     }
-    setVisible(true);
-    if (duration <= 0) return;
     const timer = window.setTimeout(() => {
       setVisible(false);
       onDismiss?.();
     }, duration);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.cancelAnimationFrame(visibilityFrame);
+      window.clearTimeout(timer);
+    };
   }, [message, duration, onDismiss]);
 
   if (!visible || !message) return null;
