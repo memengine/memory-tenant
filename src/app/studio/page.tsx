@@ -198,7 +198,7 @@ export default function StudioPage() {
     () => listGlobalAgents(getToken),
     { refreshInterval: 60000 },
   );
-  const agents = agentsQuery.data ?? [];
+  const agents = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) ?? agents[0], [agents, selectedAgentId]);
   const activeIndex = studioSteps.find((step) => step.id === activeStep)?.index ?? 1;
   const consentUrl = buildConsentUrl(selectedAgent, selectedCategories, stateValue, returnUrl);
@@ -388,7 +388,7 @@ await mem.add(
           <div className="grid gap-5 p-5 lg:grid-cols-[0.9fr_1.1fr] md:p-6">
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex items-center gap-2 text-lg font-medium text-slate-950"><Link2 className="size-5 text-sky-600" /> Consent URL</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Use this when your agent needs permission to read a user's Memory Passport. Put the generated URL behind a button such as Connect shared memory. The URL starts a permission flow; it does not grant access by itself.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Use this when your agent needs permission to read a user&apos;s Memory Passport. Put the generated URL behind a button such as Connect shared memory. The URL starts a permission flow; it does not grant access by itself.</p>
               <div className="mt-5 grid gap-3">
                 <div><label className="text-sm font-medium text-slate-700">State / request ID</label><Input value={stateValue} onChange={(event) => setStateValue(event.target.value)} className="mt-1 bg-white" /><p className="mt-1 text-xs leading-5 text-slate-500">Optional value your app receives back after approval. Use it to match this consent result to the right user, session, or request.</p></div>
                 <div><label className="text-sm font-medium text-slate-700">Return URL</label><Input value={returnUrl} onChange={(event) => setReturnUrl(event.target.value)} className="mt-1 bg-white" /><p className="mt-1 text-xs text-slate-500">Optional. Leave blank to show MemoryOS success screen.</p></div>
