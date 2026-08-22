@@ -10,7 +10,6 @@ import {
   ExternalLink,
   KeyRound,
   Play,
-  ServerCog,
   Sparkles,
 } from "lucide-react";
 

@@ -173,7 +173,6 @@ function EngineMetricCard({
   icon: Icon,
   loading,
   error,
-  onRetry,
   tooltip,
   tone,
 }: {
