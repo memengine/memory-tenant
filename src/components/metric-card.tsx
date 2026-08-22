@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -15,7 +14,6 @@ export function MetricCard({
   icon: Icon,
   loading = false,
   error,
-  onRetry,
 }: {
   title: string;
   value: string;
