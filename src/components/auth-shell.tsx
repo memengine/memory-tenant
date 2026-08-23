@@ -37,7 +37,7 @@ export const authAppearance = {
     formFieldInput:
       "!h-12 !rounded-full !border !border-white/15 !bg-white/[0.04] !px-5 !text-white placeholder:!text-slate-500 !shadow-none !outline-none focus:!border-white/35 focus:!ring-4 focus:!ring-white/[0.04]",
     formButtonPrimary:
-      "!h-12 !rounded-full !bg-white !font-black !text-black !shadow-none transition hover:!bg-slate-200",
+      "!h-12 !rounded-full !bg-white !font-black !text-black !shadow-none transition hover:!bg-slate-200 disabled:!bg-slate-200 disabled:!text-zinc-800 disabled:!opacity-100 [&_*]:!text-black",
     footer: "!mt-4 !bg-transparent",
     footerPages: "hidden",
     footerPageLink: "hidden",
