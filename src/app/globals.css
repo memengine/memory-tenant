@@ -48,6 +48,22 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Clerk can apply a disabled-state color to the waitlist label after the
+   appearance classes are resolved. Keep the live auth CTA readable. */
+.memoryos-auth-card .cl-formButtonPrimary,
+.memoryos-auth-card .cl-formButtonPrimary *,
+.memoryos-auth-card button[type="submit"],
+.memoryos-auth-card button[type="submit"] * {
+  color: #18181b !important;
+  -webkit-text-fill-color: #18181b !important;
+  opacity: 1 !important;
+}
+
+.memoryos-auth-card .cl-formButtonPrimary:disabled,
+.memoryos-auth-card button[type="submit"]:disabled {
+  background: #e2e8f0 !important;
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
