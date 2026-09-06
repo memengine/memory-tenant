@@ -211,7 +211,7 @@ import { auth } from "@/lib/auth";
 const MEMORYOS_API_URL = process.env.MEMORYOS_API_URL ?? "${apiBaseUrl}";
 const MEMORYOS_API_KEY = process.env.MEMORYOS_API_KEY;
 const MEMORYOS_AGENT_ID = process.env.MEMORYOS_AGENT_ID;
-const MEMORYOS_CONSENT_URL = process.env.MEMORYOS_CONSENT_URL ?? "${consentBaseUrl || "https://consent.memoryos.io"}";
+const MEMORYOS_CONSENT_URL = process.env.MEMORYOS_CONSENT_URL ?? "${consentBaseUrl || "https://consent.memoryo.dev"}";
 
 export async function POST() {
   const session = await auth();
@@ -311,15 +311,16 @@ await mem.add(
         <div className="grid gap-8 p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
-              <Sparkles className="size-3.5" /> Integration Studio
+              <Sparkles className="size-3.5" /> Optional · Passport Studio
             </div>
-            <h1 className="mt-5 max-w-3xl text-4xl font-medium leading-tight tracking-[-0.01em] md:text-5xl">See the Memory Passport flow one step at a time.</h1>
+            <h1 className="mt-5 max-w-3xl text-4xl font-medium leading-tight tracking-[-0.01em] md:text-5xl">Preview optional cross-app memory sharing.</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-              Studio shows what belongs in your product, what your backend creates, and what MemoryOS hosts. No hidden magic: the signed-in customer ID comes from your own app session.
+              This is not required for normal MemoryOS integration. Use it only when users need to share approved context across independent applications or agents.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button onClick={() => setActiveStep("connector")} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300"><Play className="size-4" /> Try connector flow</Button>
               <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10"><Link href="/memory-passport"><Fingerprint className="size-4" />Create Passport agent</Link></Button>
+              <Button asChild variant="outline" className="border-white/20 bg-white/5 text-white hover:bg-white/10"><Link href="/sdk"><KeyRound className="size-4" />Normal integration</Link></Button>
             </div>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5">
