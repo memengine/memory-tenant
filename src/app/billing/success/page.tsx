@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { getDashboardToken } from "@/lib/api";
 
 type SubscriptionPayload = {
-  plan_tier?: "free" | "starter" | "growth" | "enterprise";
+  plan_tier?: "free" | "starter" | "growth" | "scale" | "enterprise";
   limits?: {
     monthly_call_limit?: number | null;
     write_call_limit?: number | null;
     rate_limit_per_user_per_minute?: number | null;
   };
   data?: {
-    plan_tier?: "free" | "starter" | "growth" | "enterprise";
+    plan_tier?: "free" | "starter" | "growth" | "scale" | "enterprise";
     limits?: {
       monthly_call_limit?: number | null;
       write_call_limit?: number | null;
@@ -25,13 +25,20 @@ type SubscriptionPayload = {
 };
 
 type SubscriptionState = {
-  plan_tier: "free" | "starter" | "growth" | "enterprise";
+  plan_tier: "free" | "starter" | "growth" | "scale" | "enterprise";
   limits?: {
     monthly_call_limit?: number | null;
     write_call_limit?: number | null;
     rate_limit_per_user_per_minute?: number | null;
   };
 };
+
+const PAID_PLAN_TIERS = new Set<SubscriptionState["plan_tier"]>([
+  "starter",
+  "growth",
+  "scale",
+  "enterprise",
+]);
 
 function normalizeSubscription(payload: SubscriptionPayload): SubscriptionState | null {
   const planTier = payload.plan_tier ?? payload.data?.plan_tier;
@@ -58,7 +65,6 @@ export default function BillingSuccessPage() {
   const { isLoaded, getToken } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "timeout">("loading");
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
-  const initialPlanRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -73,6 +79,12 @@ export default function BillingSuccessPage() {
 
     let cancelled = false;
     let elapsed = 0;
+    const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+    const expectedPlan = PAID_PLAN_TIERS.has(
+      requestedPlan as SubscriptionState["plan_tier"],
+    )
+      ? requestedPlan
+      : null;
 
     async function pollSubscription() {
       try {
@@ -88,14 +100,14 @@ export default function BillingSuccessPage() {
           const nextSubscription = normalizeSubscription(
             (await response.json()) as SubscriptionPayload,
           );
-          if (nextSubscription) {
-            if (initialPlanRef.current === null) {
-              initialPlanRef.current = nextSubscription.plan_tier;
-            } else if (nextSubscription.plan_tier !== initialPlanRef.current) {
-              setSubscription(nextSubscription);
-              setStatus("success");
-              return;
-            }
+          if (
+            nextSubscription &&
+            (nextSubscription.plan_tier === expectedPlan ||
+              (!expectedPlan && PAID_PLAN_TIERS.has(nextSubscription.plan_tier)))
+          ) {
+            setSubscription(nextSubscription);
+            setStatus("success");
+            return;
           }
         }
       } catch {
@@ -125,7 +137,7 @@ export default function BillingSuccessPage() {
             <Loader2 className="mx-auto size-12 animate-spin text-[#2E75B6]" />
             <h1 className="mt-6 text-2xl font-bold">Activating your plan...</h1>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              Stripe confirmed the checkout. MemoryOS is syncing your new limits.
+              Razorpay confirmed the checkout. MemoryOS is syncing your new limits.
             </p>
           </>
         ) : status === "success" && subscription ? (
