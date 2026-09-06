@@ -148,7 +148,7 @@ export default function MemoryPassportPage() {
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [shareMode, setShareMode] = useState<"consent" | "connector">("consent");
+  const [shareMode, setShareMode] = useState<"consent" | "connector">("connector");
 
   const agentsQuery = useSWR(isLoaded ? "tenant-global-agents" : null, () => listGlobalAgents(getToken), {
     refreshInterval: 30_000,
@@ -235,18 +235,21 @@ export default function MemoryPassportPage() {
       <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white shadow-sm">
         <div className="grid gap-8 p-6 lg:grid-cols-[1fr_420px] lg:p-8">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-300">Memory Passport</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-300">Optional · Cross-app sharing</span>
             <h1 className="mt-3 max-w-3xl text-3xl font-medium leading-tight tracking-[-0.01em] sm:text-4xl">
-              Let users approve what your AI agents can remember.
+              Let users carry approved context between independent AI applications.
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
-              Create one public agent identity, put a connect button in your product, and send users to MemoryOS to approve categories, expiry, and revocation. Nothing is shared until the user says yes.
+              You do not need Memory Passport to use MemoryOS inside your application. Enable this only when a user chooses to share selected context across products, organisations, or independently operated agents.
             </p>
+            <Button asChild variant="outline" className="mt-5 border-white/20 bg-white/5 text-white hover:bg-white/10">
+              <a href="/sdk">Use normal governed memory instead</a>
+            </Button>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <div className="text-sm font-medium text-white">Setup path</div>
+            <div className="text-sm font-medium text-white">Optional sharing setup</div>
             <div className="mt-4 space-y-3 text-sm text-slate-300">
-              {["Create a Passport agent profile users can recognize.", "Choose a consent URL or secure-link connector flow.", "User approves access in the MemoryOS consent center."].map((item, index) => (
+              {["Create the public identity users will recognize.", "Add the recommended secure account connection.", "The user reviews categories and approves before sharing."].map((item, index) => (
                 <div key={item} className="flex items-start gap-3">
                   <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-sky-400 text-xs font-semibold text-slate-950">{index + 1}</span>
                   <span>{item}</span>
@@ -269,7 +272,15 @@ export default function MemoryPassportPage() {
         </div>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <details className="group rounded-[2rem] border border-slate-200 bg-white" open={agents.length === 0 ? true : undefined}>
+        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-slate-950">
+          <span className="flex items-center justify-between gap-4">
+            <span>{agents.length === 0 ? "Step 1 · Create a sharing identity" : "Sharing identity settings"}</span>
+            <span className="text-sm font-normal text-slate-500 group-open:hidden">Show</span>
+            <span className="hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
+          </span>
+        </summary>
+      <section className="grid gap-6 border-t border-slate-100 p-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="overflow-hidden">
           <CardHeader className="border-b border-slate-100 bg-white">
             <CardTitle className="flex items-center gap-2">
@@ -281,32 +292,44 @@ export default function MemoryPassportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 p-5">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Agent name</span>
-                <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Study Buddy" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Website URL</span>
-                <Input value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://yourapp.com" />
-              </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Description</span>
-                <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="AI tutor that uses approved shared memory." />
-              </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Logo URL</span>
-                <Input value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} placeholder="https://yourapp.com/logo.png" />
-              </label>
-            </div>
+            <label className="block max-w-xl space-y-2">
+              <span className="text-sm font-medium text-slate-700">Agent name</span>
+              <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Study Buddy" />
+              <span className="block text-xs leading-5 text-slate-500">Use the product or assistant name your users already recognize.</span>
+            </label>
 
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm font-medium text-slate-800">Default categories</div>
-                <p className="text-sm text-slate-500">These are only defaults. Users can remove categories before approving access.</p>
+            <details className="group rounded-2xl border border-slate-200 bg-slate-50">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
+                <span className="flex items-center justify-between gap-4">
+                  <span>Advanced identity settings</span>
+                  <span className="font-normal text-slate-500">Optional</span>
+                </span>
+              </summary>
+              <div className="space-y-5 border-t border-slate-200 p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">Website URL</span>
+                    <Input value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="https://yourapp.com" />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">Logo URL</span>
+                    <Input value={logoUrl} onChange={(event) => setLogoUrl(event.target.value)} placeholder="https://yourapp.com/logo.png" />
+                  </label>
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">Description</span>
+                    <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="AI tutor that uses approved shared memory." />
+                  </label>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-sm font-medium text-slate-800">Default categories</div>
+                    <p className="text-sm text-slate-500">Users can change these defaults before approving access.</p>
+                  </div>
+                  <CategoryPicker selected={defaultCategories} onChange={setDefaultCategories} />
+                </div>
               </div>
-              <CategoryPicker selected={defaultCategories} onChange={setDefaultCategories} />
-            </div>
+            </details>
 
             <Button onClick={() => void handleCreateAgent()} disabled={busy || !name.trim()}>
               {busy ? "Creating..." : "Create agent identity"}
@@ -350,19 +373,20 @@ export default function MemoryPassportPage() {
           </Card>
         </aside>
       </section>
+      </details>
 
       <Card className="overflow-hidden">
         <CardHeader className="border-b border-slate-100 bg-white">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle>Share access with users</CardTitle>
+              <CardTitle>{agents.length > 0 ? "Step 2 · Add cross-app sharing" : "Add cross-app sharing"}</CardTitle>
               <CardDescription>
-                Select an agent, choose the sharing method, then place the generated link behind your product button.
+                Use the secure account connection for most applications. The reusable consent URL remains available as an advanced alternative.
               </CardDescription>
             </div>
             <div className="grid rounded-2xl border border-slate-200 bg-slate-50 p-1 sm:grid-cols-2">
-              <button type="button" onClick={() => setShareMode("consent")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "consent" ? "bg-white text-sky-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Consent URL</button>
-              <button type="button" onClick={() => setShareMode("connector")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "connector" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Secure-link connector</button>
+              <button type="button" onClick={() => setShareMode("connector")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "connector" ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Secure connection · Recommended</button>
+              <button type="button" onClick={() => setShareMode("consent")} className={["rounded-xl px-4 py-2 text-sm font-semibold transition", shareMode === "consent" ? "bg-white text-sky-800 shadow-sm" : "text-slate-500 hover:text-slate-800"].join(" ")}>Reusable consent URL</button>
             </div>
           </div>
         </CardHeader>
@@ -445,7 +469,7 @@ export default function MemoryPassportPage() {
               ) : (
                 <div className="space-y-5">
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
-                    Use this when your app does not have OAuth yet. Your backend creates this single-use link after the customer is signed in, then redirects them to MemoryOS to approve the connector.
+                    <strong>Recommended:</strong> your backend creates a single-use link for the signed-in customer. MemoryOS then asks the user to approve the connection. No MemoryOS button is required in your product until you choose to offer cross-app sharing.
                   </div>
 
                   <label className="space-y-2">
@@ -496,7 +520,15 @@ export default function MemoryPassportPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <details className="group rounded-[2rem] border border-slate-200 bg-white">
+        <summary className="cursor-pointer list-none px-5 py-4 font-semibold text-slate-950">
+          <span className="flex items-center justify-between gap-4">
+            <span>Developer details and existing identities</span>
+            <span className="text-sm font-normal text-slate-500 group-open:hidden">Show</span>
+            <span className="hidden text-sm font-normal text-slate-500 group-open:inline">Hide</span>
+          </span>
+        </summary>
+      <Card className="rounded-none border-x-0 border-b-0 shadow-none">
         <CardHeader>
           <CardTitle>Passport agents</CardTitle>
           <CardDescription>Public identities registered by this workspace. Private keys are shown only once at creation time.</CardDescription>
@@ -525,6 +557,7 @@ export default function MemoryPassportPage() {
           )}
         </CardContent>
       </Card>
+      </details>
 
       <RevealKeyDialog open={revealOpen} rawKey={rawAgentKey} onOpenChange={setRevealOpen} onCloseComplete={() => setRawAgentKey(null)} />
     </div>
