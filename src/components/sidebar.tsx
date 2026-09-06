@@ -39,9 +39,9 @@ const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/memories", label: "Memories", icon: Brain },
   { href: "/playground", label: "Playground", icon: Sparkles },
-  { href: "/studio", label: "Studio", icon: Workflow },
-  { href: "/sdk", label: "SDK", icon: Code2 },
-  { href: "/memory-passport", label: "Memory Passport", icon: Fingerprint },
+  { href: "/sdk", label: "Get started", icon: Code2 },
+  { href: "/studio", label: "Passport Studio", icon: Workflow },
+  { href: "/memory-passport", label: "Cross-app sharing", icon: Fingerprint },
   { href: "/users", label: "Users", icon: Users },
   { href: "/quality-log", label: "Quality Log", icon: ShieldAlert },
   { href: "/conflicts", label: "Conflicts", icon: GitMerge },
@@ -50,7 +50,7 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-const docsBase = (process.env.NEXT_PUBLIC_DOCS_URL ?? "https://memoryengine.mintlify.app").replace(/\/$/, "");
+const docsBase = (process.env.NEXT_PUBLIC_DOCS_URL ?? "https://docs.memoryo.dev").replace(/\/$/, "");
 const docsHref = docsBase;
 const legalLinks = [
   { label: "Privacy", href: `${docsBase}/privacy` },

@@ -46,7 +46,9 @@ function WorkspaceNoticeInner() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthRoute =
-    pathname.startsWith("/sign-in") || pathname.startsWith("/sign-up");
+    pathname.startsWith("/sign-in") ||
+    pathname.startsWith("/sign-up") ||
+    pathname.startsWith("/onboarding");
 
   if (isAuthRoute) {
     return <>{children}</>;
@@ -64,4 +66,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
