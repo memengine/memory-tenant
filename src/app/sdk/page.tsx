@@ -16,36 +16,34 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const docsUrl = "https://memoryengine.mintlify.app";
+const docsUrl = "https://docs.memoryo.dev";
 
 const backendSnippet = `import os
 from memoryos import Memory
 
 mem = Memory(api_key=os.environ["MEMORYOS_API_KEY"])
 
-# 1. Store useful context after a conversation or workflow.
-mem.add(
+# Store useful context after a conversation or workflow.
+write = mem.add(
     messages=[
         {"role": "user", "content": "I prefer Hindi replies for product explanations."},
         {"role": "assistant", "content": "Got it. I will explain product details in Hindi when possible."},
     ],
     external_user_id="customer_123",
-    agent_id="support_bot",
-    metadata={"source": "support_chat", "ticket_id": "TCK-1842"},
 )
 
-# 2. Retrieve prompt-ready context before your model answers.
+# Writes are asynchronous. Wait only when verifying the first integration.
+if not write.job_id:
+    raise RuntimeError(f"Memory write was not queued: {write.status}")
+job = mem.wait_for_job(write.job_id)
+if not job.succeeded:
+    raise RuntimeError(f"Memory write failed: {job.error_summary or job.status}")
+
+# Retrieve prompt-ready context before your model answers.
 context = mem.get(
     query="How should I reply to this customer?",
     external_user_id="customer_123",
-)
-
-# 3. Optional: close the loop if the retrieved memory was wrong or missing.
-if context.retrieval_id:
-    mem.feedback(
-        retrieval_id=context.retrieval_id,
-        outcome="helpful",
-    )`;
+)`;
 
 const steps = [
   {
@@ -58,19 +56,25 @@ const steps = [
   {
     title: "Install the SDK",
     body: "Add the package to your backend app. Do not call MemoryOS directly from browser code.",
-    code: "pip install memoryos",
+    code: "pip install memoryo-sdk",
     icon: Code2,
   },
   {
     title: "Store and retrieve memory",
-    body: "Use a stable external_user_id from your app. MemoryOS handles extraction, scoring, provenance, and retrieval.",
+    body: "Run one add → wait → get verification with a stable external_user_id from your app.",
     icon: Sparkles,
   },
 ];
 
 export default function SdkPage() {
   return (
-    <div className="space-y-6 pt-14 md:pt-0"><div className="flex flex-wrap gap-2">
+    <div className="space-y-6 pt-14 md:pt-0">
+      <section className="rounded-[2rem] border border-sky-100 bg-sky-50 p-6">
+        <span className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">Recommended first integration</span>
+        <h1 className="mt-3 text-3xl font-medium tracking-tight text-slate-950">Add governed memory without consent screens or a Memory Passport.</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">Use your existing application user IDs and authentication. Cross-app sharing is an optional capability you can enable later.</p>
+      </section>
+      <div className="flex flex-wrap gap-2">
         <Button asChild variant="outline">
           <Link href="/api-keys"><KeyRound className="size-4" />API Keys</Link>
         </Button>
@@ -104,7 +108,7 @@ export default function SdkPage() {
                   <pre className="overflow-x-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100"><code>{step.code}</code></pre>
                 ) : (
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">
-                    Use the complete backend snippet below. It includes add, get, metadata, and feedback in one place.
+                    Use the complete backend snippet below. It verifies one asynchronous write before retrieval.
                   </div>
                 )}
               </CardContent>
@@ -120,7 +124,7 @@ export default function SdkPage() {
               <div>
                 <CardTitle>Copy this backend snippet</CardTitle>
                 <CardDescription>
-                  Replace the customer ID, agent ID, and metadata with values from your app. This is the normal SDK path for solo builders and small teams.
+                  Replace the customer ID with the stable user ID from your app. Keep this code in your backend.
                 </CardDescription>
               </div>
               <Button variant="outline" onClick={() => void navigator.clipboard.writeText(backendSnippet)}>
@@ -139,13 +143,13 @@ export default function SdkPage() {
           <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-950">
             <CheckCircle2 className="mt-1 size-4 shrink-0 text-emerald-700" />
             <span>
-              <strong>What this gives you:</strong> extraction, scoring, source metadata, provenance debugging, retrieval IDs, and feedback for retrospective correction.
+              <strong>What this verifies:</strong> authentication, asynchronous extraction, persistence, and retrieval for one user.
             </span>
           </div>
           <div className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
             <Clock3 className="mt-1 size-4 shrink-0 text-amber-700" />
             <span>
-              <strong>MCP server:</strong> coming soon. SDK integration stays the primary production path until MCP has enough real user feedback.
+              <strong>After this works:</strong> add source metadata, provenance, feedback, agents, or MCP only when your product needs them.
             </span>
           </div>
         </div>
