@@ -33,6 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useConflictStats } from "@/hooks/useConflictStats";
 import { useDomainSchema } from "@/hooks/useDomainSchema";
+import { memoryPassportEnabled } from "@/lib/features";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -40,8 +41,12 @@ const navItems = [
   { href: "/memories", label: "Memories", icon: Brain },
   { href: "/playground", label: "Playground", icon: Sparkles },
   { href: "/sdk", label: "Get started", icon: Code2 },
-  { href: "/studio", label: "Passport Studio", icon: Workflow },
-  { href: "/memory-passport", label: "Cross-app sharing", icon: Fingerprint },
+  ...(memoryPassportEnabled
+    ? [
+        { href: "/studio", label: "Passport Studio", icon: Workflow },
+        { href: "/memory-passport", label: "Cross-app sharing", icon: Fingerprint },
+      ]
+    : []),
   { href: "/users", label: "Users", icon: Users },
   { href: "/quality-log", label: "Quality Log", icon: ShieldAlert },
   { href: "/conflicts", label: "Conflicts", icon: GitMerge },
